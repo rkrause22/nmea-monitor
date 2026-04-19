@@ -861,14 +861,19 @@ def process_stream(stream: Iterable[str]) -> None:
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Read NMEA-0183 sentences from a file or serial port."
+        description="Read NMEA-0183 sentences from a file or serial port, emit aggregated ZDA/MWD/MDA/GGA messages."
+    )
+    parser.add_argument(
+        "-f", 
+        "--file", 
+        dest="file_path", 
+        help="Text file to read",
     )
     parser.add_argument(
         "-p",
         "--port",
         help="Serial device to read, for example COM3 or /dev/ttyUSB0",
     )
-    parser.add_argument("-f", "--file", dest="file_path", help="Text file to read")
     parser.add_argument(
         "-b",
         "--baud",
