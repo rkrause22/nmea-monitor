@@ -9,6 +9,6 @@ In practical terms, it acts as a filter/aggregator: noisy inbound NMEA goes in, 
 
 ### How it runs
 
---file <path> reads recorded NMEA text from a file.
---port <port> --baud <rate> reads a live serial feed.
-With neither option, it probes common serial ports and baud rates to find a valid NMEA source.
+* --file <path> reads recorded NMEA text from a file.
+* --port <port> --baud <rate> reads a live serial feed.
+* With neither option, it probes common serial ports and baud rates to find a valid NMEA source.
