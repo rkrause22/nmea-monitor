@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 import time
@@ -27,6 +28,8 @@ PREFERRED_DEVICE_NAMES = [
     "/dev/ttyUSB0",
     "/dev/ttyACM0",
 ]
+ZDA_WARNING_INTERVAL_SECONDS = 60.0
+ZDA_TIMEOUT_SECONDS = 600.0
 DEBUG_LOG_HANDLE: Optional[TextIO] = None
 
 
@@ -65,6 +68,13 @@ def log_nmea_error(context: str, error: NMEAError, raw: Optional[str] = None) ->
     DEBUG_LOG_HANDLE.flush()
 
 
+def log_debug_message(context: str, message: str) -> None:
+    if DEBUG_LOG_HANDLE is None:
+        return
+    DEBUG_LOG_HANDLE.write(f"[{context}] {message}\n")
+    DEBUG_LOG_HANDLE.flush()
+
+
 @dataclass
 class NMEASentence:
     raw: str
@@ -83,15 +93,21 @@ class MWDData:
 
 @dataclass
 class MWDAggregator:
-    true_direction_sum: float = 0.0
-    magnetic_direction_sum: float = 0.0
+    true_direction_sin_sum: float = 0.0
+    true_direction_cos_sum: float = 0.0
+    magnetic_direction_sin_sum: float = 0.0
+    magnetic_direction_cos_sum: float = 0.0
     knots_sum: float = 0.0
     metres_per_second_sum: float = 0.0
     count: int = 0
 
     def add(self, sample: MWDData) -> None:
-        self.true_direction_sum += sample.true_direction
-        self.magnetic_direction_sum += sample.magnetic_direction
+        true_direction_sin, true_direction_cos = polar_components(sample.true_direction)
+        magnetic_direction_sin, magnetic_direction_cos = polar_components(sample.magnetic_direction)
+        self.true_direction_sin_sum += true_direction_sin
+        self.true_direction_cos_sum += true_direction_cos
+        self.magnetic_direction_sin_sum += magnetic_direction_sin
+        self.magnetic_direction_cos_sum += magnetic_direction_cos
         self.knots_sum += sample.knots
         self.metres_per_second_sum += sample.metres_per_second
         self.count += 1
@@ -101,8 +117,11 @@ class MWDAggregator:
             averages = (0.0, 0.0, 0.0, 0.0)
         else:
             averages = (
-                self.true_direction_sum / self.count,
-                self.magnetic_direction_sum / self.count,
+                average_direction_degrees(self.true_direction_sin_sum, self.true_direction_cos_sum),
+                average_direction_degrees(
+                    self.magnetic_direction_sin_sum,
+                    self.magnetic_direction_cos_sum,
+                ),
                 self.knots_sum / self.count,
                 self.metres_per_second_sum / self.count,
             )
@@ -117,8 +136,10 @@ class MWDAggregator:
         return self.count > 0
 
     def reset(self) -> None:
-        self.true_direction_sum = 0.0
-        self.magnetic_direction_sum = 0.0
+        self.true_direction_sin_sum = 0.0
+        self.true_direction_cos_sum = 0.0
+        self.magnetic_direction_sin_sum = 0.0
+        self.magnetic_direction_cos_sum = 0.0
         self.knots_sum = 0.0
         self.metres_per_second_sum = 0.0
         self.count = 0
@@ -143,10 +164,14 @@ class MDAData:
 class MDAAggregator:
     sums: list[float]
     counts: list[int]
+    direction_sin_sums: list[float]
+    direction_cos_sums: list[float]
 
     def __init__(self) -> None:
         self.sums = [0.0] * 11
         self.counts = [0] * 11
+        self.direction_sin_sums = [0.0] * 11
+        self.direction_cos_sums = [0.0] * 11
 
     def add(self, sample: MDAData) -> None:
         values = [
@@ -165,7 +190,12 @@ class MDAAggregator:
         for index, value in enumerate(values):
             if value is None:
                 continue
-            self.sums[index] += value
+            if index in (7, 8):
+                direction_sin, direction_cos = polar_components(value)
+                self.direction_sin_sums[index] += direction_sin
+                self.direction_cos_sums[index] += direction_cos
+            else:
+                self.sums[index] += value
             self.counts[index] += 1
 
     def has_data(self) -> bool:
@@ -173,7 +203,9 @@ class MDAAggregator:
 
     def average_sentence(self) -> str:
         averages = [
-            "" if count == 0 else format_average(total / count, index)
+            ""
+            if count == 0
+            else format_average(average_mda_field(self, index), index)
             for index, (total, count) in enumerate(zip(self.sums, self.counts))
         ]
         body = (
@@ -186,6 +218,8 @@ class MDAAggregator:
     def reset(self) -> None:
         self.sums = [0.0] * 11
         self.counts = [0] * 11
+        self.direction_sin_sums = [0.0] * 11
+        self.direction_cos_sums = [0.0] * 11
 
 
 @dataclass
@@ -300,6 +334,24 @@ def compute_checksum(body: str) -> int:
 
 def build_sentence(body: str) -> str:
     return f"${body}*{compute_checksum(body):02X}"
+
+
+def polar_components(direction_degrees: float) -> tuple[float, float]:
+    radians = math.radians(direction_degrees)
+    return math.sin(radians), math.cos(radians)
+
+
+def average_direction_degrees(sin_sum: float, cos_sum: float) -> float:
+    return math.degrees(math.atan2(sin_sum, cos_sum)) % 360.0
+
+
+def average_mda_field(aggregator: MDAAggregator, field_index: int) -> float:
+    if field_index in (7, 8):
+        return average_direction_degrees(
+            aggregator.direction_sin_sums[field_index],
+            aggregator.direction_cos_sums[field_index],
+        )
+    return aggregator.sums[field_index] / aggregator.counts[field_index]
 
 
 def format_average(value: float, field_index: int) -> str:
@@ -617,11 +669,8 @@ class SerialStream(InputStream):
         while True:
             line = self.connection.readline()
             if not line:
-                continue
-            try:
-                return line.decode("ascii", errors="ignore")
-            except UnicodeDecodeError:
-                continue
+                return ""
+            return line.decode("ascii", errors="ignore")
 
     def close(self) -> None:
         self.connection.close()
@@ -707,7 +756,30 @@ def scan_for_nmea_stream(probe_seconds: float) -> tuple[SerialStream, str, int]:
 
 
 def read_until_first_zda(stream: Iterable[str]) -> NMEASentence:
+    wait_started_at = time.monotonic()
+    next_warning_at = wait_started_at + ZDA_WARNING_INTERVAL_SECONDS
+    timeout_at = wait_started_at + ZDA_TIMEOUT_SECONDS
+
     for raw in stream:
+        now = time.monotonic()
+        if now >= timeout_at:
+            message = (
+                "timed out after 10 minutes waiting for a valid ZDA sentence"
+            )
+            log_debug_message("read_until_first_zda", message)
+            raise RuntimeError(message)
+        if now >= next_warning_at:
+            elapsed_minutes = int((now - wait_started_at) // 60)
+            message = (
+                f"Warning: still waiting for a valid ZDA sentence after "
+                f"{elapsed_minutes} minute{'s' if elapsed_minutes != 1 else ''}"
+            )
+            print(message, file=sys.stderr, flush=True)
+            log_debug_message("read_until_first_zda", message)
+            next_warning_at += ZDA_WARNING_INTERVAL_SECONDS
+
+        if raw.strip() == "":
+            continue
         try:
             sentence = parse_sentence(raw)
             parse_zda(sentence)
