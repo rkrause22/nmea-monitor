@@ -9,6 +9,8 @@ import os
 import sys
 import time
 import traceback
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterable, Optional
@@ -427,6 +429,26 @@ def sanitize_filename_prefix(value: str) -> str:
     return sanitized or "source"
 
 
+def upload_payload(url: str, payload: dict[str, object]) -> None:
+    endpoint = f"{url.rstrip('/')}/add"
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    request = urllib.request.Request(
+        endpoint,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            response.read()
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            f"API upload failed with HTTP {exc.code} for {endpoint}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"API upload failed for {endpoint}: {exc.reason}") from exc
+
+
 def emit_buffer(
     args: argparse.Namespace,
     source_name: str,
@@ -459,6 +481,9 @@ def emit_buffer(
             for sentence in buffer:
                 handle.write(sentence.raw)
                 handle.write("\n")
+
+    if args.url:
+        upload_payload(args.url, payload)
 
 
 def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
@@ -543,6 +568,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "-s",
         "--source",
         help="Override the source name emitted in JSON output",
+    )
+    parser.add_argument(
+        "-u",
+        "--url",
+        help="API endpoint base URL where JSON NMEA payloads should be uploaded",
     )
     parser.add_argument(
         "--scan-timeout",

@@ -14,3 +14,20 @@ usage: see --help options
 This program is a command-line NMEA-0183 filtering tool. It reads NMEA sentences from a serial port or an input text file. After it sees the first valid ZDA sentence, it then uses later ZDA sentences as interval boundaries. For each interval, it collects sentences whose types match the --filter list, which must include ZDA and defaults to ZDA,MWD,MDA,GGA, and outputs those records to an output file, or the screen for debugging. Ultimately, this program will support sending the filtered results to an API.
 
 usage: see --help options
+
+## nmea-repository.py
+
+This program runs a Flask REST service that stores JSON batches emitted by `nmea-filter.py`.
+It creates a SQLite database at `data/nmea-repository.db` by default, or uses the database
+specified by `NMEA_REPOSITORY_DATABASE_URL`.
+
+Routes:
+
+* `PUT /add` accepts a JSON object with `source`, `start`, and `sentences`, then stores the
+  complete message in the `Messages` table keyed by `source` and normalized UTC `utc`.
+* `GET /get/<source>` returns the latest sentence batch for the source as plain text.
+* `GET /get/<source>/<time>` returns the latest sentence batch matching the supplied time.
+* `GET /search/<source>?start=<time>&end=<time>` returns all sentence batches in the optional
+  inclusive date range as plain text.
+
+Time route and query values use `yyyy[-mm[-dd[:hh[:mm[:ss]]]]]`.
