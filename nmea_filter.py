@@ -9,12 +9,23 @@ import os
 import re
 import sys
 import time
-import traceback
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from collections import deque
+from functools import partial
 from typing import Iterable, Optional
+
+from nmea_helpers import (
+    FrameAggregator,
+    NMEAError,
+    NMEASentence,
+    combine_frames,
+    format_utc_datetime,
+    log_error_message as write_log_error_message,
+    log_exception as write_log_exception,
+    parse_sentence,
+    parse_zda_datetime,
+)
 
 try:
     import serial  # type: ignore
@@ -26,6 +37,7 @@ except ImportError:  # pragma: no cover - depends on local environment
 
 COMMON_BAUD_RATES = [4800, 9600, 19200, 38400, 57600, 115200]
 DEFAULT_FILTER_TYPES = ["ZDA", "MWD", "MDA", "GGA"]
+PERMITTED_AGGREGATE_TYPES = ("MWD", "MDA", "GGA")
 PREFERRED_DEVICE_NAMES = [
     "/dev/serial0",
     "/dev/ttyAMA0",
@@ -39,18 +51,8 @@ ZDA_WARNING_INTERVAL_SECONDS = 60.0
 ZDA_TIMEOUT_SECONDS = 600.0
 RESTART_DELAY_SECONDS = 60.0
 PROGRAM_NAME = os.path.splitext(os.path.basename(__file__))[0]
-
-
-class NMEAError(ValueError):
-    """Raised when an NMEA sentence is malformed."""
-
-
-@dataclass
-class NMEASentence:
-    raw: str
-    formatter: str
-    sentence_type: str
-    fields: list[str]
+log_exception = partial(write_log_exception, PROGRAM_NAME, __file__)
+log_error_message = partial(write_log_error_message, PROGRAM_NAME, __file__)
 
 
 class InputStream:
@@ -97,125 +99,6 @@ class SerialStream(InputStream):
 
     def close(self) -> None:
         self.connection.close()
-
-
-def compute_checksum(body: str) -> int:
-    checksum = 0
-    for char in body:
-        checksum ^= ord(char)
-    return checksum
-
-
-def parse_sentence(raw_line: str) -> NMEASentence:
-    raw = raw_line.strip()
-    if not raw:
-        raise NMEAError("empty input")
-    if not raw.startswith("$"):
-        raise NMEAError("missing '$' prefix")
-    if "*" not in raw:
-        raise NMEAError("missing checksum separator")
-
-    body, checksum_text = raw[1:].split("*", 1)
-    if len(checksum_text) != 2:
-        raise NMEAError("checksum must be two hex characters")
-
-    try:
-        expected_checksum = int(checksum_text, 16)
-    except ValueError as exc:
-        raise NMEAError("checksum is not valid hexadecimal") from exc
-
-    actual_checksum = compute_checksum(body)
-    if actual_checksum != expected_checksum:
-        raise NMEAError(
-            f"checksum mismatch: expected {expected_checksum:02X}, got {actual_checksum:02X}"
-        )
-
-    fields = body.split(",")
-    formatter = fields[0]
-    if len(formatter) < 5:
-        raise NMEAError("formatter is too short")
-
-    return NMEASentence(
-        raw=raw,
-        formatter=formatter,
-        sentence_type=formatter[-3:].upper(),
-        fields=fields[1:],
-    )
-
-
-def parse_zda_datetime(sentence: NMEASentence) -> datetime:
-    if sentence.sentence_type != "ZDA":
-        raise NMEAError("not a ZDA sentence")
-    if len(sentence.fields) < 4:
-        raise NMEAError("ZDA sentence does not contain enough fields")
-
-    time_text, day_text, month_text, year_text = sentence.fields[:4]
-    if len(time_text) < 6:
-        raise NMEAError("ZDA time is too short")
-
-    try:
-        hours = int(time_text[0:2])
-        minutes = int(time_text[2:4])
-        seconds = float(time_text[4:])
-        day = int(day_text)
-        month = int(month_text)
-        year = int(year_text)
-    except ValueError as exc:
-        raise NMEAError("ZDA fields are not numeric") from exc
-
-    whole_seconds = int(seconds)
-    microseconds = int(round((seconds - whole_seconds) * 1_000_000))
-    if microseconds == 1_000_000:
-        whole_seconds += 1
-        microseconds = 0
-
-    try:
-        return datetime(
-            year,
-            month,
-            day,
-            hours,
-            minutes,
-            whole_seconds,
-            microseconds,
-            tzinfo=timezone.utc,
-        )
-    except ValueError as exc:
-        raise NMEAError("ZDA date/time is out of range") from exc
-
-
-def log_exception(
-    message: str,
-    exc: BaseException,
-    sentence: Optional[NMEASentence | str] = None,
-) -> None:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    logs_dir = os.path.join(script_dir, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_path = os.path.join(logs_dir, f"{PROGRAM_NAME}-{today}.log")
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
-    details = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    with open(log_path, "a", encoding="utf-8") as handle:
-        handle.write(f"{timestamp} [ERROR] {PROGRAM_NAME} - {message}: {exc}\n")
-        if sentence is not None:
-            if isinstance(sentence, NMEASentence):
-                sentence_text = sentence.raw
-            else:
-                sentence_text = sentence.strip()
-            handle.write(f"{timestamp} [ERROR] {PROGRAM_NAME} - NMEA sentence: {sentence_text}\n")
-        handle.write(details)
-
-
-def log_error_message(message: str) -> None:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    logs_dir = os.path.join(script_dir, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_path = os.path.join(logs_dir, f"{PROGRAM_NAME}-{today}.log")
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
-    with open(log_path, "a", encoding="utf-8") as handle:
-        handle.write(f"{timestamp} [ERROR] {PROGRAM_NAME} - {message}\n")
 
 
 def parse_filter_types(value: str) -> set[str]:
@@ -420,10 +303,6 @@ def read_until_first_zda(stream: Iterable[str]) -> NMEASentence:
     raise RuntimeError("the input ended before a valid ZDA sentence was received")
 
 
-def format_utc_datetime(value: datetime) -> str:
-    return value.isoformat().replace("+00:00", "Z")
-
-
 def upload_payload(url: str, payload: dict[str, object]) -> None:
     endpoint = f"{url.rstrip('/')}"
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -444,9 +323,33 @@ def upload_payload(url: str, payload: dict[str, object]) -> None:
         raise RuntimeError(f"API upload failed for {endpoint}: {exc.reason}") from exc
 
 
+def get_raw_sentence(sentence: NMEASentence | str) -> str:
+    if isinstance(sentence, NMEASentence):
+        return sentence.raw
+    return sentence
+
+
+def build_aggregated_buffer(
+    starting_zda: NMEASentence,
+    frame_window: deque[FrameAggregator],
+    filter_types: set[str],
+) -> list[str]:
+    combined_frame = combine_frames(list(frame_window))
+    sentences: list[str] = []
+    if "ZDA" in filter_types:
+        sentences.append(starting_zda.raw)
+    if "MWD" in filter_types and combined_frame.mwd.has_data():
+        sentences.append(combined_frame.mwd.average_sentence())
+    if "MDA" in filter_types and combined_frame.mda.has_data():
+        sentences.append(combined_frame.mda.average_sentence())
+    if "GGA" in filter_types and combined_frame.gga.has_data():
+        sentences.append(combined_frame.gga.average_sentence())
+    return sentences
+
+
 def emit_buffer(
     args: argparse.Namespace,
-    buffer: list[NMEASentence],
+    buffer: list[NMEASentence | str],
     starting_zda: NMEASentence,
     ending_zda: Optional[NMEASentence],
 ) -> None:
@@ -459,7 +362,7 @@ def emit_buffer(
     }
     if ending_zda is not None:
         payload["end"] = format_utc_datetime(parse_zda_datetime(ending_zda))
-    payload["sentences"] = [sentence.raw for sentence in buffer]
+    payload["sentences"] = [get_raw_sentence(sentence) for sentence in buffer]
 
     if args.debug:
         output = json.dumps(payload, indent=2)
@@ -477,11 +380,15 @@ def emit_buffer(
         )
         with open(data_folder, "a", encoding="utf-8") as handle:
             for sentence in buffer:
-                handle.write(sentence.raw)
+                handle.write(get_raw_sentence(sentence))
                 handle.write("\n")
 
 
 def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
+    if args.aggregation > 0:
+        process_aggregated_stream(stream, args)
+        return
+
     interval_start_zda = read_until_first_zda(stream)
     last_sentence = interval_start_zda
     buffer: list[NMEASentence] = []
@@ -511,6 +418,56 @@ def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
             emit_buffer(args, buffer, interval_start_zda, new_sentence)
             buffer.clear()
             interval_start_zda = new_sentence
+
+        last_sentence = new_sentence
+
+
+def process_aggregated_stream(stream: InputStream, args: argparse.Namespace) -> None:
+    interval_start_zda = read_until_first_zda(stream)
+    last_sentence = interval_start_zda
+    current_frame = FrameAggregator()
+    frame_window: deque[FrameAggregator] = deque(maxlen=args.aggregation)
+
+    while True:
+        if last_sentence.sentence_type in PERMITTED_AGGREGATE_TYPES:
+            try:
+                current_frame.add_sentence(last_sentence)
+            except NMEAError as exc:
+                log_exception("invalid aggregate sentence skipped", exc, last_sentence)
+
+        while True:
+            new_sentence = next_valid_sentence(stream)
+            if new_sentence is None:
+                frame_window.append(current_frame)
+                buffer = build_aggregated_buffer(
+                    interval_start_zda,
+                    frame_window,
+                    args.filter,
+                )
+                emit_buffer(args, buffer, interval_start_zda, None)
+                break
+            if new_sentence.sentence_type != "ZDA":
+                break
+            try:
+                parse_zda_datetime(new_sentence)
+                break
+            except NMEAError as exc:
+                log_exception("invalid ZDA sentence skipped", exc, new_sentence)
+                continue
+
+        if new_sentence is None:
+            break
+
+        if new_sentence.sentence_type == "ZDA":
+            frame_window.append(current_frame)
+            buffer = build_aggregated_buffer(
+                interval_start_zda,
+                frame_window,
+                args.filter,
+            )
+            emit_buffer(args, buffer, interval_start_zda, new_sentence)
+            interval_start_zda = new_sentence
+            current_frame = FrameAggregator()
 
         last_sentence = new_sentence
 
@@ -565,6 +522,13 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Filename prefix for filtered NMEA output in data folder",
     )
     parser.add_argument(
+        "-a",
+        "--aggregation",
+        type=int,
+        default=0,
+        help="Number of ZDA frames to aggregate over (default: 0, disabled)",
+    )
+    parser.add_argument(
         "-u",
         "--url",
         help="URL where filtered and aggregated NMEA output should be uploaded (eg. https://nmea.myorg.com/add/myorg/mydevice)",
@@ -588,6 +552,17 @@ def validate_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace
         parser.error("--data requires --prefix")
     if args.data_prefix and not re.fullmatch(r"[A-Za-z0-9]+", args.data_prefix):
         parser.error("--prefix may contain only letters and numbers")
+    if args.aggregation < 0:
+        parser.error("--aggregation must be greater than or equal to zero")
+    if args.aggregation > 0:
+        permitted_filter_types = {"ZDA", *PERMITTED_AGGREGATE_TYPES}
+        unsupported_types = sorted(args.filter - permitted_filter_types)
+        if unsupported_types:
+            parser.error(
+                "--aggregation is only supported when --filter contains ZDA "
+                f"and these aggregate types: {','.join(PERMITTED_AGGREGATE_TYPES)}; "
+                f"unsupported type(s): {','.join(unsupported_types)}"
+            )
 
 
 def run_once(args: argparse.Namespace) -> None:

@@ -9,16 +9,16 @@ In practical terms, it acts as a filter/aggregator: noisy inbound NMEA goes in, 
 
 usage: see --help options
 
-## nmea-filter.py
+## nmea_filter.py
 
 This program is a command-line NMEA-0183 filtering tool. It reads NMEA sentences from a serial port or an input text file. After it sees the first valid ZDA sentence, it then uses later ZDA sentences as interval boundaries. For each interval, it collects sentences whose types match the --filter list, which must include ZDA and defaults to ZDA,MWD,MDA,GGA, and outputs those records to an output file, or the screen for debugging. Ultimately, this program will support sending the filtered results to an API.
 
 usage: see --help options
 
-## nmea-repository.py
+## nmea_repository.py
 
-This program runs a Flask REST service that stores JSON batches emitted by `nmea-filter.py`.
-It creates a SQLite database at `data/nmea-repository.db` by default, or uses the database
+This program runs a Flask REST service that stores JSON batches emitted by `nmea_filter.py`.
+It creates a SQLite database at `data/nmea_repository.db` by default, or uses the database
 specified by `NMEA_REPOSITORY_DATABASE_URL`.
 
 Routes:

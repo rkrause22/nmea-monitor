@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""REST repository for JSON batches emitted by nmea-filter."""
+"""REST repository for JSON batches emitted by nmea_filter."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 
 PROGRAM_NAME = os.path.splitext(os.path.basename(__file__))[0]
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DATABASE_PATH = Path(SCRIPT_DIR) / "data" / "nmea-repository.db"
+DEFAULT_DATABASE_PATH = Path(SCRIPT_DIR) / "data" / "nmea_repository.db"
 DATABASE_URL = os.environ.get("NMEA_REPOSITORY_DATABASE_URL", f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}")
 
 
@@ -221,10 +221,6 @@ def next_boundary(value: datetime, precision: str) -> datetime:
     if precision == "minute":
         return value + timedelta(minutes=1)
     return value + timedelta(seconds=1)
-
-
-def format_utc_datetime(value: datetime) -> str:
-    return value.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def get_latest_messages(
