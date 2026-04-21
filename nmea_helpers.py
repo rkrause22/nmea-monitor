@@ -7,6 +7,7 @@ import os
 import traceback
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 
@@ -72,10 +73,29 @@ class MWDAggregator:
     def average_sentence(self) -> str:
         if self.count == 0:
             raise NMEAError("cannot emit averaged MWD without samples")
+        true_direction = format_rounded_decimal(
+            average_direction_degrees(
+                self.true_direction_sin_sum,
+                self.true_direction_cos_sum,
+            ),
+            1,
+        )
+        magnetic_direction = format_rounded_decimal(
+            average_direction_degrees(
+                self.magnetic_direction_sin_sum,
+                self.magnetic_direction_cos_sum,
+            ),
+            1,
+        )
+        knots = format_rounded_average(self.knots_sum, self.count, 1)
+        metres_per_second = format_rounded_average(
+            self.metres_per_second_sum,
+            self.count,
+            1,
+        )
         body = (
-            f"WIMWD,{average_direction_degrees(self.true_direction_sin_sum, self.true_direction_cos_sum):.1f},T,"
-            f"{average_direction_degrees(self.magnetic_direction_sin_sum, self.magnetic_direction_cos_sum):.1f},M,"
-            f"{self.knots_sum / self.count:.1f},N,{self.metres_per_second_sum / self.count:.1f},M"
+            f"WIMWD,{true_direction},T,{magnetic_direction},M,"
+            f"{knots},N,{metres_per_second},M"
         )
         return build_sentence(body)
 
@@ -173,8 +193,9 @@ class GGAData:
 
 @dataclass
 class GGAAggregator:
-    latitude_sum: float = 0.0
-    longitude_sum: float = 0.0
+    position_x_sum: float = 0.0
+    position_y_sum: float = 0.0
+    position_z_sum: float = 0.0
     satellites_sum: float = 0.0
     hdop_sum: float = 0.0
     altitude_sum: float = 0.0
@@ -187,8 +208,13 @@ class GGAAggregator:
     last_reference_station_id: Optional[str] = None
 
     def add(self, sample: GGAData) -> None:
-        self.latitude_sum += sample.latitude_degrees
-        self.longitude_sum += sample.longitude_degrees
+        position_x, position_y, position_z = geographic_components(
+            sample.latitude_degrees,
+            sample.longitude_degrees,
+        )
+        self.position_x_sum += position_x
+        self.position_y_sum += position_y
+        self.position_z_sum += position_z
         self.satellites_sum += sample.satellites_in_use
         self.hdop_sum += sample.hdop
         self.altitude_sum += sample.altitude_metres
@@ -204,8 +230,9 @@ class GGAAggregator:
             self.last_reference_station_id = sample.reference_station_id
 
     def extend(self, other: "GGAAggregator") -> None:
-        self.latitude_sum += other.latitude_sum
-        self.longitude_sum += other.longitude_sum
+        self.position_x_sum += other.position_x_sum
+        self.position_y_sum += other.position_y_sum
+        self.position_z_sum += other.position_z_sum
         self.satellites_sum += other.satellites_sum
         self.hdop_sum += other.hdop_sum
         self.altitude_sum += other.altitude_sum
@@ -228,23 +255,39 @@ class GGAAggregator:
             raise NMEAError("cannot emit averaged GGA without samples")
         if self.last_fix_time is None:
             raise NMEAError("cannot emit averaged GGA without a fix time")
+        latitude_degrees, longitude_degrees = average_geographic_degrees(
+            self.position_x_sum,
+            self.position_y_sum,
+            self.position_z_sum,
+        )
         latitude_text, latitude_hemisphere = decimal_degrees_to_nmea_latitude(
-            self.latitude_sum / self.count
+            latitude_degrees
         )
         longitude_text, longitude_hemisphere = decimal_degrees_to_nmea_longitude(
-            self.longitude_sum / self.count
+            longitude_degrees
         )
         geoid_separation_text = ""
         geoid_unit = ""
         if self.geoid_separation_count > 0:
-            geoid_separation_text = f"{self.geoid_separation_sum / self.geoid_separation_count:.1f}"
+            geoid_separation_text = format_rounded_average(
+                self.geoid_separation_sum,
+                self.geoid_separation_count,
+                1,
+            )
             geoid_unit = "M"
-        dgps_age_text = "" if self.last_dgps_age_seconds is None else f"{self.last_dgps_age_seconds:.1f}"
+        dgps_age_text = (
+            ""
+            if self.last_dgps_age_seconds is None
+            else format_rounded_decimal(self.last_dgps_age_seconds, 1)
+        )
+        hdop_text = format_rounded_average(self.hdop_sum, self.count, 1)
+        altitude_text = format_rounded_average(self.altitude_sum, self.count, 1)
+        satellites_text = format_rounded_average_int(self.satellites_sum, self.count)
         body = (
             f"GPGGA,{self.last_fix_time},{latitude_text},{latitude_hemisphere},"
             f"{longitude_text},{longitude_hemisphere},{self.best_fix_quality},"
-            f"{int(round(self.satellites_sum / self.count)):02d},{self.hdop_sum / self.count:.1f},"
-            f"{self.altitude_sum / self.count:.1f},M,{geoid_separation_text},{geoid_unit},"
+            f"{satellites_text:02d},{hdop_text},"
+            f"{altitude_text},M,{geoid_separation_text},{geoid_unit},"
             f"{dgps_age_text},{self.last_reference_station_id or ''}"
         )
         return build_sentence(body)
@@ -389,6 +432,20 @@ def polar_components(direction_degrees: float, weight: float = 1.0) -> tuple[flo
     return math.sin(radians) * weight, math.cos(radians) * weight
 
 
+def geographic_components(
+    latitude_degrees: float,
+    longitude_degrees: float,
+) -> tuple[float, float, float]:
+    latitude_radians = math.radians(latitude_degrees)
+    longitude_radians = math.radians(longitude_degrees)
+    cos_latitude = math.cos(latitude_radians)
+    return (
+        cos_latitude * math.cos(longitude_radians),
+        cos_latitude * math.sin(longitude_radians),
+        math.sin(latitude_radians),
+    )
+
+
 def average_direction_degrees(sin_sum: float, cos_sum: float) -> float:
     if math.hypot(sin_sum, cos_sum) < 1e-12:
         return 0.0
@@ -398,19 +455,58 @@ def average_direction_degrees(sin_sum: float, cos_sum: float) -> float:
     return degrees
 
 
+def average_geographic_degrees(
+    x_sum: float,
+    y_sum: float,
+    z_sum: float,
+) -> tuple[float, float]:
+    horizontal = math.hypot(x_sum, y_sum)
+    if math.hypot(horizontal, z_sum) < 1e-12:
+        return 0.0, 0.0
+    latitude = math.degrees(math.atan2(z_sum, horizontal))
+    longitude = math.degrees(math.atan2(y_sum, x_sum))
+    return latitude, longitude
+
+
 def average_mda_field(aggregator: MDAAggregator, field_index: int) -> float:
     if field_index in (7, 8):
         return average_direction_degrees(
             aggregator.direction_sin_sums[field_index],
             aggregator.direction_cos_sums[field_index],
         )
-    return aggregator.sums[field_index] / aggregator.counts[field_index]
+    return average_value(aggregator.sums[field_index], aggregator.counts[field_index])
 
 
 def format_average(value: float, field_index: int) -> str:
     if field_index in (0, 1):
-        return f"{value:.4f}"
-    return f"{value:.1f}"
+        return format_rounded_decimal(value, 4)
+    return format_rounded_decimal(value, 1)
+
+
+def format_rounded_decimal(value: float, places: int) -> str:
+    quantizer = Decimal("1").scaleb(-places)
+    rounded = decimal_from_float(value).quantize(quantizer, rounding=ROUND_HALF_UP)
+    return f"{rounded:.{places}f}"
+
+
+def format_rounded_average(total: float, count: int, places: int) -> str:
+    quantizer = Decimal("1").scaleb(-places)
+    average = decimal_from_float(total) / Decimal(count)
+    rounded = average.quantize(quantizer, rounding=ROUND_HALF_UP)
+    return f"{rounded:.{places}f}"
+
+
+def format_rounded_average_int(total: float, count: int) -> int:
+    average = decimal_from_float(total) / Decimal(count)
+    return int(average.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def average_value(total: float, count: int) -> float:
+    return float(decimal_from_float(total) / Decimal(count))
+
+
+def decimal_from_float(value: float) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.000000001"), rounding=ROUND_HALF_UP)
 
 
 def parse_optional_float(value: str, field_name: str) -> Optional[float]:
@@ -460,7 +556,8 @@ def decimal_degrees_to_nmea_latitude(value: float) -> tuple[str, str]:
     absolute_value = abs(value)
     degrees = int(absolute_value)
     minutes = (absolute_value - degrees) * 60.0
-    return f"{degrees:02d}{minutes:07.4f}", hemisphere
+    degrees, minutes_text = format_nmea_degrees_minutes(degrees, minutes)
+    return f"{degrees:02d}{minutes_text}", hemisphere
 
 
 def decimal_degrees_to_nmea_longitude(value: float) -> tuple[str, str]:
@@ -468,7 +565,19 @@ def decimal_degrees_to_nmea_longitude(value: float) -> tuple[str, str]:
     absolute_value = abs(value)
     degrees = int(absolute_value)
     minutes = (absolute_value - degrees) * 60.0
-    return f"{degrees:03d}{minutes:07.4f}", hemisphere
+    degrees, minutes_text = format_nmea_degrees_minutes(degrees, minutes)
+    return f"{degrees:03d}{minutes_text}", hemisphere
+
+
+def format_nmea_degrees_minutes(
+    degrees: int,
+    minutes: float,
+) -> tuple[int, str]:
+    minutes_text = format_rounded_decimal(minutes, 4)
+    if Decimal(minutes_text) >= Decimal("60"):
+        degrees += 1
+        minutes_text = "0.0000"
+    return degrees, minutes_text.zfill(7)
 
 
 def parse_mwd(sentence: object) -> MWDData:
