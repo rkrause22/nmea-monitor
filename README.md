@@ -24,7 +24,8 @@ specified by `NMEA_REPOSITORY_DATABASE_URL`.
 Routes:
 
 * `PUT /add` accepts a JSON object with `source`, `start`, and `sentences`, then stores the
-  complete message in the `Messages` table keyed by `source` and normalized UTC `utc`.
+  complete message in the `Messages` table keyed by `source` and normalized UTC `utc+
+  `.
 * `GET /last/<source>` returns the latest sentence batch for the source as plain text.
 * `GET /last/<source>/<count>` returns the latest count sentence batches for the source as plain text.
 * `GET /search/<source>?start=<time>&end=<time>` returns all sentence batches in the optional

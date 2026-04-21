@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import traceback
@@ -423,15 +424,8 @@ def format_utc_datetime(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
-def sanitize_filename_prefix(value: str) -> str:
-    sanitized = "".join(
-        char for char in value if char not in '<>:"/\\|?*' and ord(char) >= 32
-    ).strip()
-    return sanitized or "source"
-
-
 def upload_payload(url: str, payload: dict[str, object]) -> None:
-    endpoint = f"{url.rstrip('/')}/add"
+    endpoint = f"{url.rstrip('/')}"
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     request = urllib.request.Request(
         endpoint,
@@ -452,7 +446,6 @@ def upload_payload(url: str, payload: dict[str, object]) -> None:
 
 def emit_buffer(
     args: argparse.Namespace,
-    source_name: str,
     buffer: list[NMEASentence],
     starting_zda: NMEASentence,
     ending_zda: Optional[NMEASentence],
@@ -462,7 +455,6 @@ def emit_buffer(
 
     utc_start = parse_zda_datetime(starting_zda)
     payload = {
-        "source": source_name,
         "start": format_utc_datetime(utc_start),
     }
     if ending_zda is not None:
@@ -473,22 +465,23 @@ def emit_buffer(
         output = json.dumps(payload, indent=2)
         print(output, flush=True)
 
-    if args.output_path:
-        os.makedirs(args.output_path, exist_ok=True)
+    if args.url:
+        upload_payload(args.url, payload)
+
+    if args.data_folder:
+        os.makedirs(args.data_folder, exist_ok=True)
         output_date = utc_start.strftime("%Y-%m-%d")
-        filename_prefix = sanitize_filename_prefix(source_name)
-        output_path = os.path.join(args.output_path, f"{filename_prefix}-{output_date}.nmea")
-        with open(output_path, "a", encoding="utf-8") as handle:
+        data_folder = os.path.join(
+            args.data_folder,
+            f"{args.data_prefix}-{output_date}.nmea",
+        )
+        with open(data_folder, "a", encoding="utf-8") as handle:
             for sentence in buffer:
                 handle.write(sentence.raw)
                 handle.write("\n")
 
-    if args.url:
-        upload_payload(args.url, payload)
-
 
 def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
-    output_source = args.source if args.source is not None else stream.source_name
     interval_start_zda = read_until_first_zda(stream)
     last_sentence = interval_start_zda
     buffer: list[NMEASentence] = []
@@ -500,7 +493,7 @@ def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
         while True:
             new_sentence = next_valid_sentence(stream)
             if new_sentence is None:
-                emit_buffer(args, output_source, buffer, interval_start_zda, None)
+                emit_buffer(args, buffer, interval_start_zda, None)
                 break
             if new_sentence.sentence_type != "ZDA":
                 break
@@ -515,7 +508,7 @@ def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
             break
 
         if new_sentence.sentence_type == "ZDA":
-            emit_buffer(args, output_source, buffer, interval_start_zda, new_sentence)
+            emit_buffer(args, buffer, interval_start_zda, new_sentence)
             buffer.clear()
             interval_start_zda = new_sentence
 
@@ -534,7 +527,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     source.add_argument(
         "-p",
         "--port",
-        help="COM port or serial device to read, for example COM3 or /dev/ttyUSB0",
+        help="COM port or serial device to receive NMEA data (eg. COM3 or /dev/ttyUSB0)",
     )
     parser.add_argument(
         "-b",
@@ -546,14 +539,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     source.add_argument(
         "-i",
         "--input",
-        dest="input_path",
-        help="Text file containing NMEA-0183 sentences to be filtered",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        dest="output_path",
-        help="Folder where NMEA output should be written",
+        dest="input_file",
+        help="Text file containing raw NMEA-0183 sentences to be filtered",
     )
     parser.add_argument(
         "-f",
@@ -566,14 +553,21 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "-s",
-        "--source",
-        help="Override the source name emitted in JSON output",
+        "-d",
+        "--data",
+        dest="data_folder",
+        help="Data folder where filtered NMEA output should be written",
+    )
+    parser.add_argument(
+        "-dp",
+        "--prefix",
+        dest="data_prefix",
+        help="Filename prefix for filtered NMEA output in data folder",
     )
     parser.add_argument(
         "-u",
         "--url",
-        help="API endpoint base URL where JSON NMEA payloads should be uploaded",
+        help="URL where filtered and aggregated NMEA output should be uploaded (eg. https://nmea.myorg.com/add/myorg/mydevice)",
     )
     parser.add_argument(
         "--scan-timeout",
@@ -589,11 +583,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def validate_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if args.data_folder and not args.data_prefix:
+        parser.error("--data requires --prefix")
+    if args.data_prefix and not re.fullmatch(r"[A-Za-z0-9]+", args.data_prefix):
+        parser.error("--prefix may contain only letters and numbers")
+
+
 def run_once(args: argparse.Namespace) -> None:
     stream: Optional[InputStream] = None
     try:
-        if args.input_path:
-            stream = FileStream(args.input_path)
+        if args.input_file:
+            stream = FileStream(args.input_file)
         elif args.port:
             stream = wait_for_valid_nmea_on_port(args.port, args.baud)
         else:
@@ -608,11 +609,12 @@ def run_once(args: argparse.Namespace) -> None:
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_argument_parser()
     args = parser.parse_args(argv)
+    validate_arguments(parser, args)
 
     while True:
         try:
             run_once(args)
-            if args.input_path:
+            if args.input_file:
                 return 0
         except KeyboardInterrupt:
             return 130
