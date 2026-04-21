@@ -36,6 +36,7 @@ SERIAL_WARNING_INTERVAL_SECONDS = 60.0
 SERIAL_TIMEOUT_SECONDS = 600.0
 ZDA_WARNING_INTERVAL_SECONDS = 60.0
 ZDA_TIMEOUT_SECONDS = 600.0
+RESTART_DELAY_SECONDS = 60.0
 PROGRAM_NAME = os.path.splitext(os.path.basename(__file__))[0]
 
 
@@ -588,11 +589,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> int:
-    parser = build_argument_parser()
-    args = parser.parse_args(argv)
+def run_once(args: argparse.Namespace) -> None:
     stream: Optional[InputStream] = None
-
     try:
         if args.input_path:
             stream = FileStream(args.input_path)
@@ -602,16 +600,37 @@ def main(argv: Optional[list[str]] = None) -> int:
             stream = scan_for_nmea_stream(args.scan_timeout)
 
         process_stream(stream, args)
-        return 0
-    except KeyboardInterrupt:
-        return 130
-    except Exception as exc:
-        log_exception("unhandled exception", exc)
-        print(f"{PROGRAM_NAME}: {exc}", file=sys.stderr)
-        return 1
     finally:
         if stream is not None:
             stream.close()
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = build_argument_parser()
+    args = parser.parse_args(argv)
+
+    while True:
+        try:
+            run_once(args)
+            if args.input_path:
+                return 0
+        except KeyboardInterrupt:
+            return 130
+        except Exception as exc:
+            log_exception("unhandled exception; restarting after delay", exc)
+            log_error_message(
+                f"Restarting initialization in {int(RESTART_DELAY_SECONDS)} seconds"
+            )
+            print(
+                f"{PROGRAM_NAME}: {exc}; restarting in {int(RESTART_DELAY_SECONDS)} seconds",
+                file=sys.stderr,
+                flush=True,
+            )
+
+        try:
+            time.sleep(RESTART_DELAY_SECONDS)
+        except KeyboardInterrupt:
+            return 130
 
 
 if __name__ == "__main__":

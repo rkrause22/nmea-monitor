@@ -74,30 +74,18 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
 
         return jsonify({"status": "created"}), 201
 
-    @app.get("/get/<source>")
-    @app.get("/get/<source>/<time_text>")
-    def get_nmea_message(source: str, time_text: str | None = None) -> Response:
+    @app.get("/last/<source>")
+    @app.get("/last/<source>/<int:count>")
+    def get_nmea_latest_messages(source: str, count: int = 1) -> Response:
+        if count < 1:
+            return json_error("count must be greater than zero", 400)
+
         with session_factory() as session:
-            if time_text is None:
-                record = get_latest_message(session, source)
-            else:
-                try:
-                    start, end = parse_query_time_range(time_text)
-                except ValueError as exc:
-                    return json_error(str(exc), 400)
+            records = get_latest_messages(session, source, count)
 
-                record = session.scalars(
-                    select(NmeaMessage)
-                    .where(NmeaMessage.source == source)
-                    .where(NmeaMessage.utc >= start)
-                    .where(NmeaMessage.utc < end)
-                    .order_by(NmeaMessage.utc.desc())
-                    .limit(1)
-                ).first()
-
-        if record is None:
+        if not records:
             return plain_text("", 404)
-        return plain_text(record.sentences)
+        return plain_text("\n".join(record.sentences for record in records))
 
     @app.get("/search/<source>")
     def search_nmea_messages(source: str) -> Response:
@@ -106,10 +94,10 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
 
         with session_factory() as session:
             if start_text is None and end_text is None:
-                record = get_latest_message(session, source)
-                if record is None:
+                records = get_latest_messages(session, source)
+                if not records:
                     return plain_text("", 404)
-                return plain_text(record.sentences)
+                return plain_text(records[0].sentences)
 
             statement = (
                 select(NmeaMessage)
@@ -210,13 +198,19 @@ def format_utc_datetime(value: datetime) -> str:
     return value.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def get_latest_message(session: Session, source: str) -> NmeaMessage | None:
-    return session.scalars(
+def get_latest_messages(
+    session: Session,
+    source: str,
+    count: int = 1,
+) -> list[NmeaMessage]:
+    records = session.scalars(
         select(NmeaMessage)
         .where(NmeaMessage.source == source)
         .order_by(NmeaMessage.utc.desc())
-        .limit(1)
-    ).first()
+        .limit(count)
+    ).all()
+    records.reverse()
+    return records
 
 
 def plain_text(body: str, status: int = 200) -> Response:
