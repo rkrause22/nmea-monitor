@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import math
-import os
-import traceback
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
+
+from common_helpers import format_utc_datetime, log_error_message, log_exception
 
 
 class NMEAError(ValueError):
@@ -376,51 +376,6 @@ def parse_zda_datetime(sentence: NMEASentence) -> datetime:
         )
     except ValueError as exc:
         raise NMEAError("ZDA date/time is out of range") from exc
-
-
-def format_utc_datetime(value: datetime) -> str:
-    return value.isoformat().replace("+00:00", "Z")
-
-
-def sentence_text(sentence: NMEASentence | str) -> str:
-    if isinstance(sentence, NMEASentence):
-        return sentence.raw
-    return sentence.strip()
-
-
-def log_exception(
-    program_name: str,
-    script_file: str,
-    message: str,
-    exc: BaseException,
-    sentence: Optional[NMEASentence | str] = None,
-) -> None:
-    script_dir = os.path.dirname(os.path.abspath(script_file))
-    logs_dir = os.path.join(script_dir, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_path = os.path.join(logs_dir, f"{program_name}-{today}.log")
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
-    details = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    with open(log_path, "a", encoding="utf-8") as handle:
-        handle.write(f"{timestamp} [ERROR] {program_name} - {message}: {exc}\n")
-        if sentence is not None:
-            handle.write(
-                f"{timestamp} [ERROR] {program_name} - NMEA sentence: "
-                f"{sentence_text(sentence)}\n"
-            )
-        handle.write(details)
-
-
-def log_error_message(program_name: str, script_file: str, message: str) -> None:
-    script_dir = os.path.dirname(os.path.abspath(script_file))
-    logs_dir = os.path.join(script_dir, "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_path = os.path.join(logs_dir, f"{program_name}-{today}.log")
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
-    with open(log_path, "a", encoding="utf-8") as handle:
-        handle.write(f"{timestamp} [ERROR] {program_name} - {message}\n")
 
 
 def build_sentence(body: str) -> str:

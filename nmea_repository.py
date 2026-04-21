@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -12,11 +13,21 @@ from flask import Flask, Response, jsonify, request
 from sqlalchemy import DateTime, String, Text, create_engine, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
+from common_helpers import (
+    log_exception as write_log_exception,
+    parse_query_time_range,
+    parse_utc_datetime,
+)
+
 
 PROGRAM_NAME = os.path.splitext(os.path.basename(__file__))[0]
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATABASE_PATH = Path(SCRIPT_DIR) / "data" / "nmea_repository.db"
-DATABASE_URL = os.environ.get("NMEA_REPOSITORY_DATABASE_URL", f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}")
+DATABASE_URL = os.environ.get(
+    "NMEA_REPOSITORY_DATABASE_URL",
+    f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}",
+)
+log_exception = partial(write_log_exception, PROGRAM_NAME, __file__)
 
 
 class Base(DeclarativeBase):
@@ -53,6 +64,7 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
         try:
             start_time, sentence_text = validate_payload(payload)
         except ValueError as exc:
+            log_exception("invalid add payload", exc)
             return json_error(str(exc), 400)
 
         with session_factory.begin() as session:
@@ -106,6 +118,7 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
         try:
             statement = apply_date_filters(statement, start_text, end_text)
         except ValueError as exc:
+            log_exception("invalid count query parameters", exc)
             return json_error(str(exc), 400)
 
         with session_factory() as session:
@@ -135,6 +148,7 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
             try:
                 statement = apply_date_filters(statement, start_text, end_text)
             except ValueError as exc:
+                log_exception("invalid search query parameters", exc)
                 return json_error(str(exc), 400)
 
             records = session.scalars(statement).all()
@@ -157,44 +171,11 @@ def validate_payload(payload: dict[str, Any]) -> tuple[datetime, str]:
     ):
         raise ValueError("JSON object must contain a sentences list of strings")
 
-    start_time = parse_payload_datetime(start_value)
-    sentence_text = "\n".join(sentence for sentence in sentences if isinstance(sentence, str))
+    start_time = parse_utc_datetime(start_value)
+    sentence_text = "\n".join(
+        sentence for sentence in sentences if isinstance(sentence, str)
+    )
     return start_time, sentence_text
-
-
-def parse_payload_datetime(value: str) -> datetime:
-    normalized = value.strip()
-    if normalized.endswith("Z"):
-        normalized = f"{normalized[:-1]}+00:00"
-
-    try:
-        parsed = datetime.fromisoformat(normalized)
-    except ValueError as exc:
-        raise ValueError("start must be an ISO-8601 date/time") from exc
-
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc).replace(tzinfo=None)
-
-
-def parse_query_time_range(value: str) -> tuple[datetime, datetime]:
-    text = value.strip()
-    formats = [
-        ("%Y", "year"),
-        ("%Y-%m", "month"),
-        ("%Y-%m-%d", "day"),
-        ("%Y-%m-%d:%H", "hour"),
-        ("%Y-%m-%d:%H:%M", "minute"),
-        ("%Y-%m-%d:%H:%M:%S", "second"),
-    ]
-    for format_text, precision in formats:
-        try:
-            start = datetime.strptime(text, format_text)
-        except ValueError:
-            continue
-        return start, next_boundary(start, precision)
-
-    raise ValueError("time values must use yyyy[-mm[-dd[:hh[:mm[:ss]]]]]")
 
 
 def apply_date_filters(statement, start_text: str | None, end_text: str | None):
@@ -205,22 +186,6 @@ def apply_date_filters(statement, start_text: str | None, end_text: str | None):
         _, end = parse_query_time_range(end_text)
         statement = statement.where(NmeaMessage.utc < end)
     return statement
-
-
-def next_boundary(value: datetime, precision: str) -> datetime:
-    if precision == "year":
-        return value.replace(year=value.year + 1)
-    if precision == "month":
-        if value.month == 12:
-            return value.replace(year=value.year + 1, month=1)
-        return value.replace(month=value.month + 1)
-    if precision == "day":
-        return value + timedelta(days=1)
-    if precision == "hour":
-        return value + timedelta(hours=1)
-    if precision == "minute":
-        return value + timedelta(minutes=1)
-    return value + timedelta(seconds=1)
 
 
 def get_latest_messages(
