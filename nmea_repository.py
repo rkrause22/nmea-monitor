@@ -13,10 +13,18 @@ from flask import Flask, Response, jsonify, request
 from sqlalchemy import DateTime, String, Text, create_engine, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
-from common_helpers import (
+from nmea_helpers import (
+    FrameAggregator,
+    NMEAError,
+    average_direction_degrees,
+    average_geographic_degrees,
+    average_value,
+    format_utc_datetime,
     log_exception as write_log_exception,
+    parse_sentence,
     parse_query_time_range,
     parse_utc_datetime,
+    parse_zda_datetime,
 )
 
 
@@ -165,6 +173,20 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
             return plain_text("", 404)
         return plain_text("\n".join(record.sentences for record in records))
 
+    @app.get("/nmea/weather/<org>/<source>")
+    @app.get("/nmea/weather/<org>/<source>/<int:count>")
+    def get_nmea_weather(org: str, source: str, count: int = 1) -> Response:
+        if count < 1:
+            return json_error("count must be greater than zero", 400)
+
+        with session_factory() as session:
+            records = get_latest_messages(session, org, source, count)
+
+        if not records:
+            return jsonify({"error": "no records found"}), 404
+
+        return jsonify(build_weather_summary(records))
+
     return app
 
 
@@ -211,6 +233,126 @@ def get_latest_messages(
     ).all()
     records.reverse()
     return records
+
+
+def build_weather_summary(records: list[NmeaMessage]) -> dict[str, object]:
+    frame = FrameAggregator()
+    utc_time = records[-1].utc
+
+    for record in records:
+        for raw_sentence in record.sentences.splitlines():
+            if not raw_sentence.strip():
+                continue
+            try:
+                sentence = parse_sentence(raw_sentence)
+                if sentence.sentence_type == "ZDA":
+                    utc_time = parse_zda_datetime(sentence).replace(tzinfo=None)
+                else:
+                    frame.add_sentence(sentence)
+            except NMEAError as exc:
+                log_exception("invalid weather sentence skipped", exc, raw_sentence)
+
+    latitude, longitude = weather_position(frame)
+    temperature = weather_temperature(frame)
+    wind_direction, wind_direction_units = weather_wind_direction(frame)
+    wind_speed, wind_speed_units = weather_wind_speed(frame)
+
+    return {
+        "utc_time": format_utc_datetime(utc_time),
+        "latitude": latitude,
+        "longitude": longitude,
+        "temperature": {
+            "value": temperature,
+            "units": "C" if temperature is not None else None,
+        },
+        "wind_direction": {
+            "value": wind_direction,
+            "units": wind_direction_units,
+        },
+        "wind_speed": {
+            "value": wind_speed,
+            "units": wind_speed_units,
+        },
+    }
+
+
+def weather_position(frame: FrameAggregator) -> tuple[float | None, float | None]:
+    if not frame.gga.has_data():
+        return None, None
+    return average_geographic_degrees(
+        frame.gga.position_x_sum,
+        frame.gga.position_y_sum,
+        frame.gga.position_z_sum,
+    )
+
+
+def weather_temperature(frame: FrameAggregator) -> float | None:
+    air_temperature_index = 2
+    count = frame.mda.counts[air_temperature_index]
+    if count == 0:
+        return None
+    return average_value(frame.mda.sums[air_temperature_index], count)
+
+
+def weather_wind_direction(frame: FrameAggregator) -> tuple[float | None, str | None]:
+    if frame.mwd.has_data():
+        if frame.mwd.magnetic_direction_cos_sum or frame.mwd.magnetic_direction_sin_sum:
+            return (
+                average_direction_degrees(
+                    frame.mwd.magnetic_direction_sin_sum,
+                    frame.mwd.magnetic_direction_cos_sum,
+                ),
+                "degrees_magnetic",
+            )
+        return (
+            average_direction_degrees(
+                frame.mwd.true_direction_sin_sum,
+                frame.mwd.true_direction_cos_sum,
+            ),
+            "degrees_true",
+        )
+
+    magnetic_direction_index = 8
+    if frame.mda.counts[magnetic_direction_index] > 0:
+        return (
+            average_direction_degrees(
+                frame.mda.direction_sin_sums[magnetic_direction_index],
+                frame.mda.direction_cos_sums[magnetic_direction_index],
+            ),
+            "degrees_magnetic",
+        )
+
+    true_direction_index = 7
+    if frame.mda.counts[true_direction_index] > 0:
+        return (
+            average_direction_degrees(
+                frame.mda.direction_sin_sums[true_direction_index],
+                frame.mda.direction_cos_sums[true_direction_index],
+            ),
+            "degrees_true",
+        )
+
+    return None, None
+
+
+def weather_wind_speed(frame: FrameAggregator) -> tuple[float | None, str | None]:
+    if frame.mwd.has_data():
+        return average_value(frame.mwd.knots_sum, frame.mwd.count), "knots"
+
+    wind_knots_index = 9
+    count = frame.mda.counts[wind_knots_index]
+    if count > 0:
+        return average_value(frame.mda.sums[wind_knots_index], count), "knots"
+
+    wind_metres_per_second_index = 10
+    count = frame.mda.counts[wind_metres_per_second_index]
+    if count > 0:
+        return (
+            average_value(frame.mda.sums[wind_metres_per_second_index], count),
+            "m/s",
+        )
+
+    return None, None
 
 
 def plain_text(body: str, status: int = 200) -> Response:
