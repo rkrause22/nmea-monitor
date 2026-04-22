@@ -104,17 +104,25 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
         return plain_text("\n".join(record.sentences for record in records))
     
 
+    @app.get("/nmea/count")
+    @app.get("/nmea/count/<org>")
     @app.get("/nmea/count/<org>/<source>")
-    def count_nmea_messages(org: str, source: str) -> Response:
+    def count_nmea_messages(
+        org: str | None = None,
+        source: str | None = None,
+    ) -> Response:
         start_text = request.args.get("start")
         end_text = request.args.get("end")
 
         statement = (
             select(func.count())
             .select_from(NmeaMessage)
-            .where(NmeaMessage.org == org)
-            .where(NmeaMessage.source == source)
         )
+        if org is not None:
+            statement = statement.where(NmeaMessage.org == org)
+        if source is not None:
+            statement = statement.where(NmeaMessage.source == source)
+
         try:
             statement = apply_date_filters(statement, start_text, end_text)
         except ValueError as exc:
