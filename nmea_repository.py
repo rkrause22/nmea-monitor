@@ -9,7 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, send_from_directory
 from sqlalchemy import DateTime, String, Text, create_engine, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -36,6 +36,25 @@ DATABASE_URL = os.environ.get(
     f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}",
 )
 log_exception = partial(write_log_exception, PROGRAM_NAME, __file__)
+COMPASS_DIRECTIONS = [
+    (11.25, "N"),
+    (33.75, "NNE"),
+    (56.25, "NE"),
+    (78.75, "ENE"),
+    (101.25, "E"),
+    (123.75, "ESE"),
+    (146.25, "SE"),
+    (168.75, "SSE"),
+    (191.25, "S"),
+    (213.75, "SSW"),
+    (236.25, "SW"),
+    (258.75, "WSW"),
+    (281.25, "W"),
+    (303.75, "WNW"),
+    (326.25, "NW"),
+    (348.75, "NNW"),
+    (360.0, "N"),
+]
 
 
 class Base(DeclarativeBase):
@@ -62,6 +81,10 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
         Base.metadata.create_all(connection)
         # sneak in manual database schema and data changes here
         # connection.exec_driver_sql("ALTER TABLE Messages ADD COLUMN org TEXT NOT NULL DEFAULT 'WSC'")
+
+    @app.get("/<filename>.html")
+    def get_html_page(filename: str) -> Response:
+        return send_from_directory(SCRIPT_DIR, f"{filename}.html")
 
     @app.put("/nmea/add/<org>/<source>")
     def add_nmea_message(org: str, source: str) -> tuple[Response, int]:
@@ -255,22 +278,26 @@ def build_weather_summary(records: list[NmeaMessage]) -> dict[str, object]:
     latitude, longitude = weather_position(frame)
     temperature = weather_temperature(frame)
     wind_direction, wind_direction_units = weather_wind_direction(frame)
+    wind_direction_symbol = symbolic_wind_direction(wind_direction)
     wind_speed, wind_speed_units = weather_wind_speed(frame)
 
     return {
+        "org": records[-1].org,
+        "source": records[-1].source,
         "utc_time": format_utc_datetime(utc_time),
         "latitude": latitude,
         "longitude": longitude,
         "temperature": {
-            "value": temperature,
+            "value": round_weather_value(temperature),
             "units": "C" if temperature is not None else None,
         },
         "wind_direction": {
-            "value": wind_direction,
+            "value": round_weather_value(wind_direction),
             "units": wind_direction_units,
+            "symbol": wind_direction_symbol,
         },
         "wind_speed": {
-            "value": wind_speed,
+            "value": round_weather_value(wind_speed),
             "units": wind_speed_units,
         },
     }
@@ -302,14 +329,14 @@ def weather_wind_direction(frame: FrameAggregator) -> tuple[float | None, str | 
                     frame.mwd.magnetic_direction_sin_sum,
                     frame.mwd.magnetic_direction_cos_sum,
                 ),
-                "degrees_magnetic",
+                "M",
             )
         return (
             average_direction_degrees(
                 frame.mwd.true_direction_sin_sum,
                 frame.mwd.true_direction_cos_sum,
             ),
-            "degrees_true",
+            "T",
         )
 
     magnetic_direction_index = 8
@@ -319,7 +346,7 @@ def weather_wind_direction(frame: FrameAggregator) -> tuple[float | None, str | 
                 frame.mda.direction_sin_sums[magnetic_direction_index],
                 frame.mda.direction_cos_sums[magnetic_direction_index],
             ),
-            "degrees_magnetic",
+            "M",
         )
 
     true_direction_index = 7
@@ -329,10 +356,27 @@ def weather_wind_direction(frame: FrameAggregator) -> tuple[float | None, str | 
                 frame.mda.direction_sin_sums[true_direction_index],
                 frame.mda.direction_cos_sums[true_direction_index],
             ),
-            "degrees_true",
+            "T",
         )
 
     return None, None
+
+
+def round_weather_value(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(value, 1)
+
+
+def symbolic_wind_direction(value: float | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value % 360.0
+    for upper_bound, symbol in COMPASS_DIRECTIONS:
+        if normalized < upper_bound:
+            return symbol
+    return COMPASS_DIRECTIONS[-1][1]
 
 
 def weather_wind_speed(frame: FrameAggregator) -> tuple[float | None, str | None]:

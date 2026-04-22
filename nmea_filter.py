@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import sys
 import time
 import urllib.error
@@ -480,6 +481,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Read NMEA-0183 sentences from a file or COM port, filter and emit to file or ZDA-delimited JSON."
     )
+    parser.fromfile_prefix_chars = "@"
+    parser.convert_arg_line_to_args = shlex.split
     source = parser.add_mutually_exclusive_group()
     source.add_argument(
         "-p",
