@@ -411,9 +411,15 @@ def average_direction_degrees(sin_sum: float, cos_sum: float) -> float:
     if math.hypot(sin_sum, cos_sum) < 1e-12:
         return 0.0
     degrees = math.degrees(math.atan2(sin_sum, cos_sum)) % 360.0
-    if math.isclose(degrees, 360.0, abs_tol=1e-9):
+    return round_direction_degrees(degrees)
+
+
+def round_direction_degrees(value: float, increment: float = 5.0) -> float:
+    rounded = round(value / increment) * increment
+    rounded %= 360.0
+    if math.isclose(rounded, 360.0, abs_tol=1e-9):
         return 0.0
-    return degrees
+    return rounded
 
 
 def average_geographic_degrees(
