@@ -1,37 +1,62 @@
 # nmea-monitor project
-Python scripts to monitor and filter NMEA-0183 streams
+Python scripts and HTML pages to monitor, filter and present NMEA-0183 streams
 
-## nmea-monitor.py
+## nmea-monitor.html
 
-This program reads an NMEA-0183 stream either from a text file or a serial port, validates sentence checksums, and watches specifically for ZDA, MWD, MDA, and GGA sentences. It uses ZDA as an interval boundary, collects all MWD wind data, MDA meteorological data, and valid-fix GGA GPS data that arrive until the next ZDA, then prints the previous ZDA plus averaged output sentences for each type that had data.
+nmea-monitor.html is a simple browser-based weather dashboard for the NMEA repository. It fetches the latest weather summary from the repository’s /nmea/weather/WSC/Barge endpoint every 10 seconds and displays three current conditions: local date/time, temperature, and wind.
 
-In practical terms, it acts as a filter/aggregator: noisy inbound NMEA goes in, and a reduced stream of time-stamped averaged weather/wind/GPS sentences comes out. It can auto-scan serial ports and baud rates if you don’t specify one, and --debug writes rejected sentence details to logs/nmea_monitor.log for troubleshooting.
-
-usage: see --help options
+The page is intentionally lightweight: a single responsive table, a dynamic title/header based on the returned org and source, and a status line showing when the data was last updated or whether an error occurred. It also formats wind speed and direction cleanly, including compass symbols and degree details when available, so it works as a compact “current weather at source” display for live NMEA data.
 
 ## nmea_filter.py
 
-This program is a command-line NMEA-0183 filtering tool. It reads NMEA sentences from a serial port or an input text file. After it sees the first valid ZDA sentence, it then uses later ZDA sentences as interval boundaries. For each interval, it collects sentences whose types match the --filter list, which must include ZDA and defaults to ZDA,MWD,MDA,GGA, and outputs those records to an output file, or the screen for debugging. Ultimately, this program will support sending the filtered results to an API.
+nmea_filter.py is a command-line tool that reads NMEA-0183 data from either a serial port or an input text file, groups the stream into ZDA-delimited time frames, and emits filtered or aggregated output for downstream storage or upload. It can auto-discover a live NMEA serial source, wait for the first valid ZDA before starting, and then collect only the requested sentence types, with ZDA,MWD,MDA,GGA as the default filter.
+
+When aggregation is enabled, it reduces each ZDA frame to one representative record per supported type by averaging wind, meteorological, and GPS data over the selected window, using circular averaging for directional fields and geographic averaging for latitude/longitude. Output can be written to stdout for debugging, saved as .nmea files, or uploaded as JSON to a configured API endpoint. The program also includes retry logic for serial/API failures and writes exceptions to dated log files under logs/.
 
 usage: see --help options
 
 ## nmea_repository.py
 
-This program runs a Flask REST service that stores JSON batches emitted by `nmea_filter.py`.
-It creates a SQLite database at `data/nmea_repository.db` by default, or uses the database
-specified by `NMEA_REPOSITORY_DATABASE_URL`.
+nmea_repository.py is a small Flask-based REST service that stores filtered NMEA batches produced by nmea_filter.py. It saves each message in a SQLite database, keyed by organization, source, and UTC start time, and preserves the associated sentence payload as plain text for later retrieval.
 
-Routes:
+The service acts as a lightweight repository for uploaded NMEA frame data, with support for organization registration, bearer-token access control, retention settings, message purge operations, and retrieval/query endpoints. By default it uses a local SQLite database in the data/ folder, but the database location can be overridden with NMEA_REPOSITORY_DATABASE_URL.
 
-* `PUT /add` accepts a JSON object with `source`, `start`, and `sentences`, then stores the
-  complete message in the `Messages` table keyed by `source` and normalized UTC `utc+
-  `.
-* `GET /last/<source>` returns the latest sentence batch for the source as plain text.
-* `GET /last/<source>/<count>` returns the latest count sentence batches for the source as plain text.
-* `GET /search/<source>?start=<time>&end=<time>` returns all sentence batches in the optional
-  inclusive date range as plain text.
+Endpoints:
 
-Time query values use `yyyy[-mm[-dd[:hh[:mm[:ss]]]]]`.
+* POST /nmea/add/`org`/`source`
+  Accepts a JSON body containing start and sentences, and creates or updates the stored message for that org/source/start time. Requires a bearer token matching the organization registration.
+* POST /nmea/registrations
+  Creates a new organization registration with its authentication token and retention settings. Creating the first admin registration is a bootstrap case; later registrations require the admin bearer token.
+* GET /nmea/registrations
+  Returns all registrations, including each organization’s retention span and message limit. Requires the admin bearer token.
+* GET /nmea/registrations/`org`
+  Returns registrations whose organization name starts with the given prefix. Requires the admin bearer token.
+* DELETE /nmea/registrations/`org`
+  Deletes the specified registration and all stored messages for that organization. Requires the admin bearer token.
+* DELETE /nmea/purge/`org`/`source`
+  Purges stored messages for the source using the registered retention settings for that organization. Requires the organization bearer token.
+* DELETE /nmea/purge/`org`/`source`/`what`
+  Purges stored messages for the source using an explicit keep rule or override value, rather than the default registration settings. Requires the organization bearer token.
+* GET /nmea/last/`org`/`source`
+  Returns the latest stored message for the given org and source as plain text.
+* GET /nmea/last/`org`/`source`/`count`
+  Returns the most recent count messages for the given org and source as plain text.
+* GET /nmea/count
+  Returns the total number of stored messages across all organizations and sources, optionally filtered by start and end.
+* GET /nmea/count/`org`
+  Returns the number of stored messages for the given organization, optionally filtered by start and end.
+* GET /nmea/count/`org`/`source`
+  Returns the number of stored messages for the given organization and source, optionally filtered by start and end.
+* GET /nmea/search/`org`/`source`?start=`time`&end=`time`
+  Returns matching stored messages for the given org and source, optionally filtered by a date/time range. If no range is supplied, it returns the latest message.
+* GET /nmea/weather/`org`/`source`
+  Returns a weather-oriented summary view derived from the most recent stored message(s) for the org/source.
+* GET /nmea/weather/`org`/`source`/`count`
+  Returns a weather-oriented summary view derived from the most recent count stored messages for the org/source.
+* GET /`filename`.html
+  Serves a static HTML file from the repository directory.
+
+Time query values use yyyy[-mm[-dd[:hh[:mm[:ss]]]]].
 
 ## How to install on Raspberry PI
 
@@ -40,7 +65,7 @@ Time query values use `yyyy[-mm[-dd[:hh[:mm[:ss]]]]]`.
 * enable RP Connect so we can connect remotely
 
 ### check standard installation
-* python3 --version # Python >3.13.5
+* python3 --version # Python `3.13.5
 * sudo apt install python3-pip
 * sudo nmtui # configure fixed IP address 192.168.1.10
 * You might also want to install CUPS/SAMBA to enable AirPrint
@@ -139,12 +164,18 @@ User=russel
 # Set working directory so relative paths in your script work
 WorkingDirectory=/var/www/python/nmea
 # Use full paths for the Python interpreter and your script
-ExecStart=/usr/bin/python3 /var/www/python/nmea/nmea_filter.py -a 3 -u http://127.0.0.1:8080/nmea/add/WSC/Barge
+ExecStart=/usr/bin/python3 /var/www/python/nmea/nmea_filter.py @/var/www/python/nmea/nmea_filter.txt
 # Automatically restart if the script crashes
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
+```
+* where nmea_filter.txt contains
+```
+-u http://127.0.0.1:8080/nmea/add/WSC/Barge
+-a WindWaterWaves
+-g 3
 ```
 * sudo systemctl daemon-reload
 * sudo systemctl start nmea_filter.service

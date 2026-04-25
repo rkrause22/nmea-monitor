@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
-from sqlalchemy import DateTime, String, Text, create_engine, func, select
+from sqlalchemy import DateTime, Integer, Interval, String, Text, create_engine, delete, func, select, tuple_
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from nmea_helpers import (
@@ -20,9 +20,11 @@ from nmea_helpers import (
     average_geographic_degrees,
     average_value,
     format_utc_datetime,
+    format_timespan,
     log_exception as write_log_exception,
     parse_sentence,
     parse_query_time_range,
+    parse_timespan,
     parse_utc_datetime,
     parse_zda_datetime,
 )
@@ -70,6 +72,15 @@ class NmeaMessage(Base):
     sentences: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class NmeaRegistration(Base):
+    __tablename__ = "NmeaRegistrations"
+
+    org: Mapped[str] = mapped_column(String(collation="NOCASE"), nullable=False, primary_key=True)
+    auth: Mapped[str] = mapped_column(Text, nullable=False)
+    span: Mapped[timedelta] = mapped_column(Interval, nullable=False, default=lambda: timedelta(days=365))
+    limit: Mapped[int] = mapped_column(Integer, nullable=False, default=20000)
+
+
 def create_app(database_url: str = DATABASE_URL) -> Flask:
     app = Flask(__name__)
     if database_url == DATABASE_URL:
@@ -80,25 +91,51 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
     with engine.begin() as connection:
         Base.metadata.create_all(connection)
         # sneak in manual database schema and data changes here
-        # connection.exec_driver_sql("ALTER TABLE Messages ADD COLUMN org TEXT NOT NULL DEFAULT 'WSC'")
+        # connection.exec_driver_sql("UPDATE NmeaRegistrations SET \"limit\"=2000 WHERE org='WSC'")
 
     @app.get("/<filename>.html")
     def get_html_page(filename: str) -> Response:
         return send_from_directory(SCRIPT_DIR, f"{filename}.html")
 
-    @app.put("/nmea/add/<org>/<source>")
+    @app.post("/nmea/add/<org>/<source>")
     def add_nmea_message(org: str, source: str) -> tuple[Response, int]:
+        try:
+            bearer_token = require_bearer_token(request)
+        except ValueError as exc:
+            log_exception("access denied", exc)
+            return json_error("access denied", 401)
+
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
             return json_error("request body must be a JSON object", 400)
 
-        try:
-            start_time, sentence_text = validate_payload(payload)
-        except ValueError as exc:
-            log_exception("invalid add payload", exc)
-            return json_error(str(exc), 400)
-
         with session_factory.begin() as session:
+            registration = session.get(NmeaRegistration, {"org": org})
+            if registration is None or bearer_token != registration.auth:
+                return json_error("access denied", 401)
+
+            try:
+                start_time, sentence_text = validate_payload(payload)
+            except ValueError as exc:
+                log_exception("invalid add payload", exc)
+                return json_error(str(exc), 400)
+
+            latest_record = session.scalars(
+                select(NmeaMessage)
+                .where(NmeaMessage.org == org)
+                .where(NmeaMessage.source == source)
+                .order_by(NmeaMessage.utc.desc())
+                .limit(1)
+            ).first()
+            if latest_record is not None and latest_record.utc.date() != start_time.date():
+                purge_messages_for_source(
+                    session,
+                    org,
+                    source,
+                    registration.span,
+                    registration.limit,
+                )
+
             record = session.scalars(
                 select(NmeaMessage)
                 .where(NmeaMessage.org == org)
@@ -119,6 +156,150 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
             else:
                 record.sentences = sentence_text
                 return jsonify({"status": "updated"}), 200
+
+    @app.post("/nmea/registrations")
+    def register_org() -> tuple[Response, int]:
+        try:
+            bearer_token = require_bearer_token(request)
+        except ValueError as exc:
+            log_exception("access denied", exc)
+            return json_error("access denied", 401)
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return json_error("request body must be a JSON object", 400)
+
+        org = payload.get("org")
+        if not isinstance(org, str) or not org.strip():
+            return json_error("org must be a non-empty string", 400)
+        org = org.strip()
+
+        with session_factory.begin() as session:
+            admin_registration = session.get(NmeaRegistration, {"org": "admin"})
+            auth = payload.get("auth")
+            if org.casefold() == "admin" and admin_registration is None:
+                if not isinstance(auth, str) or bearer_token != auth:
+                    return json_error("access denied", 401)
+            else:
+                if admin_registration is None or bearer_token != admin_registration.auth:
+                    return json_error("access denied", 401)
+
+            try:
+                auth, span, limit = validate_registration_payload(payload)
+            except ValueError as exc:
+                log_exception("invalid registration payload", exc)
+                return json_error(str(exc), 400)
+
+            existing = session.get(NmeaRegistration, {"org": org})
+            if existing is not None:
+                return json_error("registration already exists", 409)
+
+            session.add(
+                NmeaRegistration(
+                    org=org,
+                    auth=auth,
+                    span=span,
+                    limit=limit,
+                )
+            )
+
+        return jsonify({"status": "created"}), 201
+
+    @app.get("/nmea/registrations")
+    @app.get("/nmea/registrations/<org>")
+    def get_registrations(org: str | None = None) -> Response:
+        try:
+            bearer_token = require_bearer_token(request)
+        except ValueError as exc:
+            log_exception("access denied", exc)
+            return json_error("access denied", 401)
+        
+        with session_factory() as session:
+            admin_registration = session.get(NmeaRegistration, {"org": "admin"})
+            if admin_registration is None or bearer_token != admin_registration.auth:
+                return json_error("access denied", 401)
+
+            statement = select(NmeaRegistration).order_by(NmeaRegistration.org.asc())
+            if org is not None:
+                statement = statement.where(
+                    NmeaRegistration.org.startswith(org, autoescape=True)
+                )
+
+            registrations = session.scalars(statement).all()
+
+        return jsonify(
+            [
+                {
+                    "org": registration.org,
+                    "span": format_timespan(registration.span),
+                    "limit": registration.limit,
+                }
+                for registration in registrations
+            ]
+        )
+
+    @app.delete("/nmea/registrations/<org>")
+    def delete_registration(org: str) -> tuple[Response, int]:
+        try:
+            bearer_token = require_bearer_token(request)
+        except ValueError as exc:
+            log_exception("access denied", exc)
+            return json_error("access denied", 401)
+
+        with session_factory.begin() as session:
+            admin_registration = session.get(NmeaRegistration, {"org": "admin"})
+            if admin_registration is None or bearer_token != admin_registration.auth:
+                return json_error("access denied", 401)
+
+            registration = session.get(NmeaRegistration, {"org": org})
+            if registration is None:
+                return json_error("registration not found", 404)
+
+            deleted_messages = session.execute(
+                delete(NmeaMessage).where(NmeaMessage.org == org)
+            ).rowcount or 0
+            session.delete(registration)
+
+        return jsonify({"status": "deleted", "messages_deleted": deleted_messages}), 200
+
+    @app.delete("/nmea/purge/<org>/<source>")
+    @app.delete("/nmea/purge/<org>/<source>/<what>")
+    def keep_nmea_messages(
+        org: str,
+        source: str,
+        what: str | None = None,
+    ) -> tuple[Response, int]:
+        try:
+            bearer_token = require_bearer_token(request)
+        except ValueError as exc:
+            log_exception("access denied", exc)
+            return json_error("access denied", 401)
+
+        with session_factory.begin() as session:
+            registration = session.get(NmeaRegistration, {"org": org})
+            if registration is None or bearer_token != registration.auth:
+                return json_error("access denied", 401)
+
+            try:
+                keep_span, keep_limit = parse_keep_value(registration, what)
+            except ValueError as exc:
+                log_exception("invalid keep parameters", exc)
+                return json_error(str(exc), 400)
+
+            deleted_messages = purge_messages_for_source(
+                session,
+                org,
+                source,
+                keep_span,
+                keep_limit,
+            )
+
+        return jsonify(
+            {
+                "status": "deleted",
+                "messages_deleted": deleted_messages,
+            }
+        ), 200
     
 
     @app.get("/nmea/last/<org>/<source>")
@@ -229,6 +410,135 @@ def validate_payload(payload: dict[str, Any]) -> tuple[datetime, str]:
         sentence for sentence in sentences if isinstance(sentence, str)
     )
     return start_time, sentence_text
+
+
+def validate_registration_payload(
+    payload: dict[str, Any]
+) -> tuple[str, timedelta, int]:
+    auth = payload.get("auth")
+    if not isinstance(auth, str) or len(auth) < 8:
+        raise ValueError("auth must be a string with length 8 or longer")
+
+    span_value = payload.get("span")
+    if span_value is None:
+        span = timedelta(days=365)
+    elif not isinstance(span_value, str) or not span_value.strip():
+        raise ValueError("span must be a non-empty string when provided")
+    else:
+        span = parse_timespan(span_value)
+
+    limit_value = payload.get("limit")
+    if limit_value is None:
+        limit = 20000
+    elif isinstance(limit_value, bool):
+        raise ValueError("limit must be an integer when provided")
+    elif isinstance(limit_value, int):
+        limit = limit_value
+    elif isinstance(limit_value, str):
+        try:
+            limit = int(limit_value.strip())
+        except ValueError as exc:
+            raise ValueError("limit must be an integer when provided") from exc
+    else:
+        raise ValueError("limit must be an integer when provided")
+
+    if limit < 1:
+        raise ValueError("limit must be greater than zero")
+
+    return auth, span, limit
+
+
+def require_bearer_token(req) -> str:
+    authorization = req.headers.get("Authorization")
+    if not authorization:
+        raise ValueError("Authorization header with Bearer token is required")
+
+    scheme, _, token = authorization.partition(" ")
+    if scheme != "Bearer" or not token:
+        raise ValueError("Authorization header must use Bearer token format")
+    return token
+
+
+def parse_keep_value(
+    registration: NmeaRegistration,
+    what: str | None,
+) -> tuple[timedelta | None, int | None]:
+    if what is None:
+        return registration.span, registration.limit
+
+    text = what.strip()
+    if not text:
+        raise ValueError("what must not be empty")
+
+    try:
+        keep_limit = int(text)
+    except ValueError:
+        return parse_timespan(text), None
+
+    if keep_limit < 0:
+        raise ValueError("count must not be negative")
+    return None, keep_limit
+
+
+def collect_message_keys_to_delete(
+    session: Session,
+    org: str,
+    source: str,
+    keep_span: timedelta | None,
+    keep_limit: int | None,
+) -> list[tuple[str, str, datetime]]:
+    keys_to_delete: set[tuple[str, str, datetime]] = set()
+
+    if keep_span is not None:
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - keep_span
+        aged_keys = session.execute(
+            select(NmeaMessage.org, NmeaMessage.source, NmeaMessage.utc)
+            .where(NmeaMessage.org == org)
+            .where(NmeaMessage.source == source)
+            .where(NmeaMessage.utc < cutoff)
+        ).all()
+        keys_to_delete.update(aged_keys)
+
+    if keep_limit is not None:
+        excess_keys = session.execute(
+            select(NmeaMessage.org, NmeaMessage.source, NmeaMessage.utc)
+            .where(NmeaMessage.org == org)
+            .where(NmeaMessage.source == source)
+            .order_by(NmeaMessage.utc.desc(), NmeaMessage.source.asc())
+            .offset(keep_limit)
+        ).all()
+        keys_to_delete.update(excess_keys)
+
+    return list(keys_to_delete)
+
+
+def purge_messages_for_source(
+    session: Session,
+    org: str,
+    source: str,
+    keep_span: timedelta | None,
+    keep_limit: int | None,
+) -> int:
+    keys_to_delete = collect_message_keys_to_delete(
+        session,
+        org,
+        source,
+        keep_span,
+        keep_limit,
+    )
+
+    if not keys_to_delete:
+        return 0
+
+    return session.execute(
+        delete(NmeaMessage).where(
+            tuple_(
+                NmeaMessage.org,
+                NmeaMessage.source,
+                NmeaMessage.utc,
+            ).in_(keys_to_delete)
+        )
+    ).rowcount or 0
 
 
 def apply_date_filters(statement, start_text: str | None, end_text: str | None):

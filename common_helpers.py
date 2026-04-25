@@ -67,18 +67,57 @@ def next_boundary(value: datetime, precision: str) -> datetime:
     return value + timedelta(seconds=1)
 
 
+def parse_timespan(value: str) -> timedelta:
+    text = " ".join(value.strip().lower().replace("+", " ").replace("-", " ").split())
+    if text in ("1 year", "1 years"):
+        return timedelta(days=365)
+
+    amount_text, _, unit = text.partition(" ")
+    try:
+        amount = int(amount_text)
+    except ValueError as exc:
+        raise ValueError(
+            "span must look like '<number> day(s)', '<number> month(s)', or '<number> year(s)'"
+        ) from exc
+
+    if amount < 1:
+        raise ValueError("span must be greater than zero")
+
+    if unit in ("day", "days"):
+        return timedelta(days=amount)
+    if unit in ("month", "months"):
+        return timedelta(days=amount * 30)
+    if unit in ("year", "years"):
+        return timedelta(days=amount * 365)
+
+    raise ValueError(
+        "span must use day(s), month(s), or year(s) units"
+    )
+
+
+def format_timespan(value: timedelta) -> str:
+    total_days = value.days
+    if total_days % 365 == 0:
+        years = total_days // 365
+        return f"{years} year" if years == 1 else f"{years} years"
+    if total_days % 30 == 0:
+        months = total_days // 30
+        return f"{months} month" if months == 1 else f"{months} months"
+    return f"{total_days} day" if total_days == 1 else f"{total_days} days"
+
+
 def log_exception(
     program_name: str,
     script_file: str,
     message: str,
     exc: BaseException,
     sentence: Any | None = None,
+    include_traceback: bool = False,
 ) -> None:
     logs_dir = logs_directory(script_file)
     today = datetime.now().strftime("%Y-%m-%d")
     log_path = os.path.join(logs_dir, f"{program_name}-{today}.log")
     timestamp = log_timestamp()
-    details = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
     with open(log_path, "a", encoding="utf-8") as handle:
         handle.write(f"{timestamp} [ERROR] {program_name} - {message}: {exc}\n")
         if sentence is not None:
@@ -86,7 +125,11 @@ def log_exception(
                 f"{timestamp} [ERROR] {program_name} - NMEA sentence: "
                 f"{sentence_text(sentence)}\n"
             )
-        handle.write(details)
+        if include_traceback:
+            details = "".join(
+                traceback.format_exception(type(exc), exc, exc.__traceback__)
+            )
+            handle.write(details)
 
 
 def log_error_message(program_name: str, script_file: str, message: str) -> None:

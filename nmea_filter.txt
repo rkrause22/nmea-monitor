@@ -1,4 +1,5 @@
--u http://192.168.1.114:8080/nmea/add/wsc/barge
+-u http://127.0.0.1:5000/nmea/add/WSC/Barge
+-a WindWaterWaves
 -p COM6
--a 2
+-g 2
 --debug

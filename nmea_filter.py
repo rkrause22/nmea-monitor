@@ -307,14 +307,21 @@ def read_until_first_zda(stream: Iterable[str]) -> NMEASentence:
     raise RuntimeError("the input ended before a valid ZDA sentence was received")
 
 
-def upload_payload(url: str, payload: dict[str, object]) -> None:
+def upload_payload(
+    url: str,
+    payload: dict[str, object],
+    auth_key: str | None = None,
+) -> None:
     endpoint = f"{url.rstrip('/')}"
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if auth_key is not None:
+        headers["Authorization"] = f"Bearer {auth_key}"
     request = urllib.request.Request(
         endpoint,
         data=body,
-        headers={"Content-Type": "application/json"},
-        method="PUT",
+        headers=headers,
+        method="POST",
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
@@ -373,7 +380,7 @@ def emit_buffer(
         print(output, flush=True)
 
     if args.url:
-        upload_payload(args.url, payload)
+        upload_payload(args.url, payload, args.auth_key)
 
     if args.data_folder:
         os.makedirs(args.data_folder, exist_ok=True)
@@ -528,11 +535,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Filename prefix for filtered NMEA output in data folder",
     )
     parser.add_argument(
-        "-a",
+        "-g",
         "--aggregation",
         type=int,
         default=0,
         help="Number of ZDA frames to aggregate over (default: 0, disabled)",
+    )
+    parser.add_argument(
+        "-a",
+        "--auth",
+        dest="auth_key",
+        help="Bearer authorization key to include in upload requests",
     )
     parser.add_argument(
         "-u",
@@ -560,6 +573,8 @@ def validate_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace
         parser.error("--prefix may contain only letters and numbers")
     if args.aggregation < 0:
         parser.error("--aggregation must be greater than or equal to zero")
+    if args.auth_key is not None and len(args.auth_key) < 8:
+        parser.error("--auth must be at least 8 characters long")
     if args.aggregation > 0:
         permitted_filter_types = {"ZDA", *PERMITTED_AGGREGATE_TYPES}
         unsupported_types = sorted(args.filter - permitted_filter_types)

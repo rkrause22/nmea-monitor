@@ -167,7 +167,7 @@
   </main>
 
   <script>
-    const WEATHER_URL = "/nmea/weather/wsc/barge";
+    const WEATHER_URL = "/nmea/weather/WSC/Barge";
     const REFRESH_INTERVAL_MS = 10000;
 
     const elements = {
@@ -271,46 +271,53 @@
 
     function formatWind(speedMeasurement, directionMeasurement) {
       const speed = measurementParts(speedMeasurement);
-      const direction = measurementParts(directionMeasurement);
+      const direction = formatDirection(directionMeasurement);
       if (!speed && !direction) {
         return "-";
       }
       if (!speed) {
-        return escapeHtml(formatDirection(direction));
+        return renderDirection(direction);
       }
       if (!direction) {
         return escapeHtml(formatMeasurement(speedMeasurement));
       }
 
       const speedUnits = speed.units === "-" ? "" : ` ${speed.units}`;
-      return `${escapeHtml(speed.value)}${escapeHtml(speedUnits)} ${escapeHtml(compassDirection(direction.value))} <span class="wind-detail">(${escapeHtml(formatDirection(direction))})</span>`;
+      return `${escapeHtml(speed.value)}${escapeHtml(speedUnits)}${renderDirection(direction, true)}`;
     }
 
-    function formatDirection(direction) {
-      const suffix = directionUnitsSuffix(direction.units);
-      return suffix ? `${direction.value}\u00b0 ${suffix}` : `${direction.value}\u00b0`;
+    function formatDirection(measurement) {
+      if (measurement === null || measurement === undefined || measurement === "") {
+        return null;
+      }
+
+      const parts = measurementParts(measurement);
+      const symbol = typeof measurement === "object"
+        ? firstValue(measurement.symbol, measurement.direction_symbol)
+        : null;
+
+      if (!parts && !symbol) {
+        return null;
+      }
+
+      return {
+        symbol: symbol ? String(symbol) : "",
+        detail: parts ? (parts.units === "-" ? `${parts.value}\u00b0` : `${parts.value}\u00b0 ${parts.units}`) : "",
+      };
     }
 
-    function compassDirection(value) {
-      const degrees = Number(value);
-      if (!Number.isFinite(degrees)) {
+    function renderDirection(direction, includeLeadingSpace = false) {
+      if (!direction) {
         return "-";
       }
 
-      const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-      const index = Math.round((((degrees % 360) + 360) % 360) / 22.5) % directions.length;
-      return directions[index];
-    }
+      const prefix = includeLeadingSpace ? " " : "";
+      const symbol = direction.symbol ? `${prefix}${escapeHtml(direction.symbol)}` : "";
+      const detail = direction.detail
+        ? `${symbol ? " " : prefix}<span class="wind-detail">(${escapeHtml(direction.detail)})</span>`
+        : "";
 
-    function directionUnitsSuffix(units) {
-      const normalized = String(units).toLowerCase();
-      if (normalized === "degrees_magnetic" || normalized === "magnetic" || normalized === "m") {
-        return "M";
-      }
-      if (normalized === "degrees_true" || normalized === "true" || normalized === "t") {
-        return "T";
-      }
-      return units === "-" ? "" : units;
+      return `${symbol}${detail}` || "-";
     }
 
     function measurementParts(measurement) {
