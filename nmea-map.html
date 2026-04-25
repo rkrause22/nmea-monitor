@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NMEA Weather Map Test</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #17212b;
+      background: #f4f7f9;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: inherit;
+      color: inherit;
+      background: #f4f7f9;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+
+    .status {
+      position: absolute;
+      z-index: 1;
+      top: 12px;
+      left: 12px;
+      max-width: min(420px, calc(100vw - 24px));
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgb(23 33 43 / 78%);
+      box-shadow: 0 2px 12px rgb(0 0 0 / 18%);
+      font-size: 14px;
+      line-height: 1.35;
+      color: #d9dee5;
+    }
+
+    .status[hidden] {
+      display: none;
+    }
+
+    .status.error {
+      color: #a12622;
+    }
+
+    .popup-card {
+      width: min(320px, calc(100vw - 56px));
+      background: #ffffff;
+      border: 1px solid #d9dee5;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+    }
+
+    .popup-title {
+      margin: 0;
+      padding: 14px 16px 6px;
+      font-size: 19px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: #17212b;
+    }
+
+    .weather-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+
+    .weather-table th,
+    .weather-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #d9dee5;
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.35;
+    }
+
+    .weather-table tr:last-child th,
+    .weather-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .weather-table th {
+      width: 58px;
+      color: #4c5a67;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .weather-table .value-cell {
+      font-weight: 600;
+    }
+
+    .cell-icon {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      color: #28758a;
+      opacity: 0.86;
+    }
+
+    .cell-icon .icon-accent {
+      color: #d15f4f;
+    }
+
+    .wind-detail {
+      color: #d9dee5;
+    }
+
+    .gm-style .gm-style-iw-c {
+      padding: 0;
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+    }
+
+    .gm-style .gm-style-iw-d {
+      overflow: hidden;
+      max-height: none;
+    }
+
+    .gm-style .gm-style-iw-chr {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="status" class="status">Loading weather data...</div>
+  <div id="map"></div>
+
+  <script>
+    const WEATHER_URL = "/nmea/weather/WSC/Barge";
+    const DEFAULT_LOCATION = { lat: 0, lng: 0 };
+    const REFRESH_INTERVAL_MS = 10000;
+
+    let map;
+    let marker;
+    let infoWindow;
+
+    window.initMap = async function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: DEFAULT_LOCATION,
+        zoom: 3,
+        mapTypeId: "hybrid",
+      });
+
+      infoWindow = new google.maps.InfoWindow();
+
+      await refreshWeather(true);
+      setInterval(() => {
+        refreshWeather(false);
+      }, REFRESH_INTERVAL_MS);
+    };
+
+    async function refreshWeather(isInitialLoad) {
+      try {
+        const weather = await fetchWeather();
+        const position = weatherPosition(weather);
+
+        if (!marker) {
+          marker = new google.maps.Marker({
+            position,
+            map,
+            title: formatTitle(weather),
+          });
+          marker.addListener("click", () => infoWindow.open({ anchor: marker, map }));
+        } else {
+          marker.setPosition(position);
+          marker.setTitle(formatTitle(weather));
+        }
+
+        if (isInitialLoad) {
+          map.setCenter(position);
+          map.setZoom(13);
+        } else {
+          map.panTo(position);
+        }
+
+        infoWindow.setContent(renderWeatherCard(weather));
+        infoWindow.open({ anchor: marker, map });
+        setStatus(`Updated ${formatLocalDateTime(new Date())}`);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
+    async function fetchWeather() {
+      const response = await fetch(WEATHER_URL, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(`Weather request failed: HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    function weatherPosition(weather) {
+      const lat = Number(weather.latitude);
+      const lng = Number(weather.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error("Weather response does not contain a valid latitude/longitude.");
+      }
+      return { lat, lng };
+    }
+
+    function renderWeatherCard(weather) {
+      return `
+        <section class="popup-card" aria-label="Current weather">
+          <h2 class="popup-title">${escapeHtml(`Current Weather at ${formatTitle(weather)}`)}</h2>
+          <table class="weather-table">
+            <tbody>
+              <tr>
+                <th scope="row" aria-label="Local date time">
+                  ${clockIcon()}
+                </th>
+                <td class="value-cell">${escapeHtml(formatLocalDateTime(weather.utc_time))}</td>
+              </tr>
+              <tr>
+                <th scope="row" aria-label="Temperature">
+                  ${thermometerIcon()}
+                </th>
+                <td class="value-cell">${escapeHtml(formatTemperature(weather.temperature))}</td>
+              </tr>
+              <tr>
+                <th scope="row" aria-label="Wind">
+                  ${windIcon()}
+                </th>
+                <td class="value-cell">${formatWind(weather.wind_speed, weather.wind_direction)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      `;
+    }
+
+    function formatLocalDateTime(value) {
+      if (!value) {
+        return "-";
+      }
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "-";
+      }
+
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(date);
+    }
+
+    function formatMeasurement(measurement) {
+      if (!measurement || measurement.value === null || measurement.value === undefined) {
+        return "-";
+      }
+
+      const value = Number(measurement.value);
+      const text = Number.isFinite(value) ? value.toFixed(1) : String(measurement.value);
+      return `${text} ${displayValue(measurement.units)}`;
+    }
+
+    function formatTemperature(measurement) {
+      const parts = measurementParts(measurement);
+      if (!parts) {
+        return "-";
+      }
+      return parts.units === "-" ? `${parts.value}\u00b0` : `${parts.value}\u00b0 ${parts.units}`;
+    }
+
+    function formatWind(speedMeasurement, directionMeasurement) {
+      const speed = measurementParts(speedMeasurement);
+      const direction = formatDirection(directionMeasurement);
+      if (!speed && !direction) {
+        return "-";
+      }
+      if (!speed) {
+        return renderDirection(direction);
+      }
+      if (!direction) {
+        return escapeHtml(formatMeasurement(speedMeasurement));
+      }
+
+      const speedUnits = speed.units === "-" ? "" : ` ${speed.units}`;
+      return `${escapeHtml(speed.value)}${escapeHtml(speedUnits)}${renderDirection(direction, true)}`;
+    }
+
+    function formatDirection(measurement) {
+      if (measurement === null || measurement === undefined || measurement === "") {
+        return null;
+      }
+
+      const parts = measurementParts(measurement);
+      const symbol = typeof measurement === "object"
+        ? firstValue(measurement.symbol, measurement.direction_symbol)
+        : null;
+
+      if (!parts && !symbol) {
+        return null;
+      }
+
+      return {
+        symbol: symbol ? String(symbol) : "",
+        detail: parts ? (parts.units === "-" ? `${parts.value}\u00b0` : `${parts.value}\u00b0 ${parts.units}`) : "",
+      };
+    }
+
+    function renderDirection(direction, includeLeadingSpace = false) {
+      if (!direction) {
+        return "-";
+      }
+
+      const prefix = includeLeadingSpace ? " " : "";
+      const symbol = direction.symbol ? `${prefix}${escapeHtml(direction.symbol)}` : "";
+      const detail = direction.detail
+        ? `${symbol ? " " : prefix}<span class="wind-detail">(${escapeHtml(direction.detail)})</span>`
+        : "";
+
+      return `${symbol}${detail}` || "-";
+    }
+
+    function measurementParts(measurement) {
+      if (measurement === null || measurement === undefined || measurement === "") {
+        return null;
+      }
+
+      if (typeof measurement !== "object") {
+        return { value: String(measurement), units: "-" };
+      }
+
+      const value = firstValue(measurement.value, measurement.val, measurement.amount);
+      if (value === null || value === undefined || value === "") {
+        return null;
+      }
+
+      return {
+        value: String(value),
+        units: displayValue(firstValue(measurement.units, measurement.unit)),
+      };
+    }
+
+    function formatTitle(weather) {
+      const org = displayValue(weather.org);
+      const source = displayValue(weather.source);
+      return org === "-" && source === "-" ? "NMEA Weather Data" : `${org} ${source}`;
+    }
+
+    function firstValue(...values) {
+      return values.find((value) => value !== null && value !== undefined && value !== "");
+    }
+
+    function clockIcon() {
+      return `
+        <svg class="cell-icon" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/>
+          <path d="M16 9.5v7l5 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9.2 5.8 6.3 8.4M22.8 5.8l2.9 2.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      `;
+    }
+
+    function thermometerIcon() {
+      return `
+        <svg class="cell-icon" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M14 18.2V7a4 4 0 0 1 8 0v11.2a7 7 0 1 1-8 0Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+          <path class="icon-accent" d="M18 10v11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <circle class="icon-accent" cx="18" cy="23" r="3.2" fill="currentColor"/>
+        </svg>
+      `;
+    }
+
+    function windIcon() {
+      return `
+        <svg class="cell-icon" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M4 11h14.5a4 4 0 1 0-3.7-5.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M4 17h20.5a3.5 3.5 0 1 1-3.2 4.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M4 23h9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+      `;
+    }
+
+    function displayValue(value) {
+      return value === null || value === undefined || value === "" ? "-" : String(value);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setStatus(message, isError = false) {
+      const status = document.getElementById("status");
+      status.textContent = message;
+      status.classList.toggle("error", isError);
+      status.hidden = !message;
+    }
+  </script>
+
+  <script
+    async
+    defer
+    src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_API_KEY&callback=initMap">
+  </script>
+</body>
+</html>
