@@ -48,6 +48,7 @@ PREFERRED_DEVICE_NAMES = [
 ]
 SERIAL_WARNING_INTERVAL_SECONDS = 60.0
 SERIAL_TIMEOUT_SECONDS = 600.0
+SERIAL_RETRY_DELAY_SECONDS = 1.0
 ZDA_WARNING_INTERVAL_SECONDS = 60.0
 ZDA_TIMEOUT_SECONDS = 600.0
 RESTART_DELAY_SECONDS = 60.0
@@ -201,6 +202,7 @@ def wait_for_valid_nmea_on_port(port: str, baudrate: int) -> SerialStream:
                 flush=True,
             )
             return open_serial_stream(port, baudrate)
+        time.sleep(min(SERIAL_RETRY_DELAY_SECONDS, remaining_seconds))
 
 
 def scan_for_nmea_stream(probe_seconds: float) -> SerialStream:
@@ -252,6 +254,7 @@ def scan_for_nmea_stream(probe_seconds: float) -> SerialStream:
                         flush=True,
                     )
                     return open_serial_stream(port, baudrate)
+                time.sleep(min(SERIAL_RETRY_DELAY_SECONDS, remaining_seconds))
 
 
 def next_valid_sentence(stream: Iterable[str]) -> Optional[NMEASentence]:

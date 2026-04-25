@@ -1,4 +1,4 @@
--u http://127.0.0.1:5000/nmea/add/wsc/barge
+-u http://192.168.1.114:8080/nmea/add/wsc/barge
 -p COM6
--a 3
+-a 2
 --debug
