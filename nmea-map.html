@@ -65,6 +65,7 @@
       font-weight: 700;
       line-height: 1.2;
       color: #17212b;
+      text-align: center;
     }
 
     .weather-table {
@@ -110,6 +111,46 @@
       color: #d15f4f;
     }
 
+    .map-marker {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      background: #28758a;
+      box-shadow: 0 2px 6px rgb(0 0 0 / 26%);
+    }
+
+    .map-pennant {
+      position: relative;
+      width: 18px;
+      height: 28px;
+    }
+
+    .map-pennant::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 1px;
+      width: 2px;
+      height: 26px;
+      background: #5d6672;
+      border-radius: 1px;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+    }
+
+    .map-pennant::after {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 4px;
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 12px solid var(--pennant-color, #f2c94c);
+      filter: drop-shadow(0 1px 1px rgb(0 0 0 / 22%));
+    }
+
     .wind-detail {
       color: #d9dee5;
     }
@@ -140,16 +181,20 @@
     const REFRESH_INTERVAL_MS = 10000;
 
     let map;
+    let AdvancedMarkerElement;
     let marker;
     let windwardMarker;
     let startpinMarker;
     let infoWindow;
 
     window.initMap = async function initMap() {
+      ({ AdvancedMarkerElement } = await google.maps.importLibrary("marker"));
+
       map = new google.maps.Map(document.getElementById("map"), {
         center: DEFAULT_LOCATION,
         zoom: 3,
         mapTypeId: "hybrid",
+        mapId: "DEMO_MAP_ID",
       });
 
       infoWindow = new google.maps.InfoWindow();
@@ -166,15 +211,17 @@
         const position = weatherPosition(weather);
 
         if (!marker) {
-          marker = new google.maps.Marker({
+          marker = new AdvancedMarkerElement({
             position,
             map,
             title: formatTitle(weather),
+            content: buildBoatMarker(),
           });
-          marker.addListener("click", () => infoWindow.open({ anchor: marker, map }));
+          marker.addEventListener("gmp-click", () => infoWindow.open({ anchor: marker, map }));
         } else {
-          marker.setPosition(position);
-          marker.setTitle(formatTitle(weather));
+          marker.position = position;
+          marker.title = formatTitle(weather);
+          marker.content = buildBoatMarker();
         }
 
         updateFlagMarker("windward", weather.windward, {
@@ -242,7 +289,7 @@
 
       if (!position) {
         if (existingMarker) {
-          existingMarker.setMap(null);
+          existingMarker.map = null;
           if (kind === "windward") {
             windwardMarker = null;
           } else {
@@ -253,11 +300,11 @@
       }
 
       if (!existingMarker) {
-        const newMarker = new google.maps.Marker({
+        const newMarker = new AdvancedMarkerElement({
           position,
           map,
           title: appearance.title,
-          icon: pennantIcon(appearance.fillColor, appearance.strokeColor),
+          content: buildPennantMarker(appearance.fillColor, appearance.strokeColor),
           zIndex: 2,
         });
         if (kind === "windward") {
@@ -268,22 +315,9 @@
         return;
       }
 
-      existingMarker.setPosition(position);
-      existingMarker.setTitle(appearance.title);
-      existingMarker.setIcon(pennantIcon(appearance.fillColor, appearance.strokeColor));
-    }
-
-    function pennantIcon(fillColor, strokeColor) {
-      return {
-        path: "M 3 2 L 3 25 M 4 3 L 18 8 L 4 13 Z",
-        fillColor,
-        fillOpacity: 1,
-        strokeColor,
-        strokeWeight: 1.5,
-        scale: 1,
-        anchor: new google.maps.Point(3, 25),
-        labelOrigin: new google.maps.Point(3, 25),
-      };
+      existingMarker.position = position;
+      existingMarker.title = appearance.title;
+      existingMarker.content = buildPennantMarker(appearance.fillColor, appearance.strokeColor);
     }
 
     function renderWeatherCard(weather) {
@@ -461,6 +495,22 @@
       `;
     }
 
+    function buildBoatMarker() {
+      return htmlToElement('<div class="map-marker" aria-hidden="true"></div>');
+    }
+
+    function buildPennantMarker(fillColor, strokeColor) {
+      return htmlToElement(
+        `<div class="map-pennant" aria-hidden="true" style="--pennant-color: ${escapeHtml(fillColor)}; color: ${escapeHtml(strokeColor)};"></div>`
+      );
+    }
+
+    function htmlToElement(html) {
+      const template = document.createElement("template");
+      template.innerHTML = html.trim();
+      return template.content.firstElementChild;
+    }
+
     function displayValue(value) {
       return value === null || value === undefined || value === "" ? "-" : String(value);
     }
@@ -485,7 +535,7 @@
   <script
     async
     defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4CBKRAhjWUsfNFzFxdMyQTjJgVgvGOyQ&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4CBKRAhjWUsfNFzFxdMyQTjJgVgvGOyQ&libraries=marker&loading=async&callback=initMap">
   </script>
 </body>
 </html>

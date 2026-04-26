@@ -60,6 +60,16 @@ COMPASS_DIRECTIONS = [
     (348.75, "NNW"),
     (360.0, "N"),
 ]
+# Estimate of ILCA VMG based on wind strength
+UPWIND_VMG_BY_WIND_SPEED = [
+    (5.0, 2.0),
+    (8.0, 2.6),
+    (10.0, 3.0),
+    (12.0, 3.3),
+    (15.0, 3.6),
+    (18.0, 3.8),
+    (22.0, 3.9),
+]
 
 
 class Base(DeclarativeBase):
@@ -628,7 +638,13 @@ def build_weather_summary(records: list[NmeaMessage]) -> dict[str, object]:
     wind_direction, wind_direction_units = weather_wind_direction(frame)
     wind_direction_symbol = symbolic_wind_direction(wind_direction)
     wind_speed, wind_speed_units = weather_wind_speed(frame)
-    windward = weather_offset_position(latitude, longitude, wind_direction, 400.0)
+    windward_range = weather_windward_range(wind_speed, wind_speed_units)
+    windward = weather_offset_position(
+        latitude,
+        longitude,
+        wind_direction,
+        windward_range,
+    )
     startpin = weather_startpin_position(latitude, longitude, wind_direction, 100.0)
 
     return {
@@ -683,6 +699,29 @@ def weather_offset_position(
         "latitude": new_latitude,
         "longitude": new_longitude,
     }
+
+
+# tries to determine a course length based on wind speed
+# 247m / 1 knot VMG is a number ChatGPT came up with
+def weather_windward_range(
+    wind_speed: float | None,
+    wind_speed_units: str | None,
+) -> float | None:
+    if wind_speed is None or wind_speed_units is None:
+        return None
+
+    if wind_speed_units == "knots":
+        wind_speed_knots = wind_speed
+    elif wind_speed_units == "m/s":
+        wind_speed_knots = wind_speed * 1.943844
+    else:
+        return None
+
+    for maximum_speed, vmg in UPWIND_VMG_BY_WIND_SPEED:
+        if wind_speed_knots <= maximum_speed:
+            return 247.0 * vmg
+
+    return 247.0 * UPWIND_VMG_BY_WIND_SPEED[-1][1]
 
 
 def weather_startpin_position(
