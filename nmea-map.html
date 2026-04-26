@@ -111,44 +111,30 @@
       color: #d15f4f;
     }
 
-    .map-marker {
-      width: 18px;
-      height: 18px;
-      border: 2px solid #ffffff;
-      border-radius: 50%;
-      background: #28758a;
-      box-shadow: 0 2px 6px rgb(0 0 0 / 26%);
+    .boat-marker {
+      width: 30px;
+      height: 30px;
+      filter: drop-shadow(0 2px 4px rgb(0 0 0 / 28%));
+      transform-origin: 50% 50%;
     }
 
-    .map-pennant {
-      position: relative;
-      width: 18px;
+    .boat-marker svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .windward-marker {
+      width: 28px;
       height: 28px;
+      filter: drop-shadow(0 2px 4px rgb(0 0 0 / 28%));
+      transform-origin: 50% 50%;
     }
 
-    .map-pennant::before {
-      content: "";
-      position: absolute;
-      left: 2px;
-      top: 1px;
-      width: 2px;
-      height: 26px;
-      background: #5d6672;
-      border-radius: 1px;
-      box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
-    }
-
-    .map-pennant::after {
-      content: "";
-      position: absolute;
-      left: 4px;
-      top: 4px;
-      width: 0;
-      height: 0;
-      border-top: 5px solid transparent;
-      border-bottom: 5px solid transparent;
-      border-left: 12px solid var(--pennant-color, #f2c94c);
-      filter: drop-shadow(0 1px 1px rgb(0 0 0 / 22%));
+    .windward-marker svg {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
 
     .wind-detail {
@@ -179,12 +165,12 @@
     const WEATHER_URL = "/nmea/weather/WSC/Barge";
     const DEFAULT_LOCATION = { lat: 0, lng: 0 };
     const REFRESH_INTERVAL_MS = 10000;
+    const DEFAULT_VIEW_HEIGHT_METRES = 1000;
 
     let map;
     let AdvancedMarkerElement;
     let marker;
     let windwardMarker;
-    let startpinMarker;
     let infoWindow;
 
     window.initMap = async function initMap() {
@@ -215,33 +201,29 @@
             position,
             map,
             title: formatTitle(weather),
-            content: buildBoatMarker(),
+            content: buildBoatMarker(directionDegrees(weather.wind_direction)),
+            anchorLeft: "-50%",
+            anchorTop: "-50%",
           });
           marker.addEventListener("gmp-click", () => infoWindow.open({ anchor: marker, map }));
         } else {
           marker.position = position;
           marker.title = formatTitle(weather);
-          marker.content = buildBoatMarker();
+          marker.content = buildBoatMarker(directionDegrees(weather.wind_direction));
         }
 
-        updateFlagMarker("windward", weather.windward, {
-          fillColor: "#f2c94c",
-          strokeColor: "#8f6b00",
+        updateWindwardMarker(weather.windward, {
+          rotationDegrees: reverseDirectionDegrees(weather.wind_direction),
           title: "Windward",
-        });
-        updateFlagMarker("startpin", weather.startpin, {
-          fillColor: "#f2994a",
-          strokeColor: "#a65316",
-          title: "Start Pin",
         });
 
         if (isInitialLoad) {
-          map.setCenter(position);
-          map.setZoom(13);
+          applyDefaultView(position);
         } else {
           map.panTo(position);
         }
 
+        document.title = popupTitle(weather);
         infoWindow.setContent(renderWeatherCard(weather));
         infoWindow.open({ anchor: marker, map });
         setStatus(`Updated ${formatLocalDateTime(new Date())}`);
@@ -269,6 +251,23 @@
       return { lat, lng };
     }
 
+    function applyDefaultView(position) {
+      const latHalfSpan = DEFAULT_VIEW_HEIGHT_METRES / 2 / 111320;
+      const container = document.getElementById("map");
+      const width = Math.max(container.clientWidth || 1, 1);
+      const height = Math.max(container.clientHeight || 1, 1);
+      const aspectRatio = width / height;
+      const lngHalfSpan = (latHalfSpan * aspectRatio) / Math.max(Math.cos(position.lat * Math.PI / 180), 0.01);
+      const bounds = {
+        north: position.lat + latHalfSpan,
+        south: position.lat - latHalfSpan,
+        east: position.lng + lngHalfSpan,
+        west: position.lng - lngHalfSpan,
+      };
+
+      map.fitBounds(bounds, 0);
+    }
+
     function optionalPosition(value) {
       if (!value || typeof value !== "object") {
         return null;
@@ -283,18 +282,14 @@
       return { lat, lng };
     }
 
-    function updateFlagMarker(kind, value, appearance) {
+    function updateWindwardMarker(value, appearance) {
       const position = optionalPosition(value);
-      const existingMarker = kind === "windward" ? windwardMarker : startpinMarker;
+      const existingMarker = windwardMarker;
 
       if (!position) {
         if (existingMarker) {
           existingMarker.map = null;
-          if (kind === "windward") {
-            windwardMarker = null;
-          } else {
-            startpinMarker = null;
-          }
+          windwardMarker = null;
         }
         return;
       }
@@ -304,26 +299,25 @@
           position,
           map,
           title: appearance.title,
-          content: buildPennantMarker(appearance.fillColor, appearance.strokeColor),
+          content: buildWindwardMarker(appearance.rotationDegrees),
+          anchorLeft: "-50%",
+          anchorTop: "-50%",
           zIndex: 2,
         });
-        if (kind === "windward") {
-          windwardMarker = newMarker;
-        } else {
-          startpinMarker = newMarker;
-        }
+        windwardMarker = newMarker;
         return;
       }
 
       existingMarker.position = position;
       existingMarker.title = appearance.title;
-      existingMarker.content = buildPennantMarker(appearance.fillColor, appearance.strokeColor);
+      existingMarker.content = buildWindwardMarker(appearance.rotationDegrees);
     }
 
     function renderWeatherCard(weather) {
+      const title = popupTitle(weather);
       return `
         <section class="popup-card" aria-label="Current weather">
-          <h2 class="popup-title">${escapeHtml(`Weather at ${formatTitle(weather)}`)}</h2>
+          <h2 class="popup-title">${escapeHtml(title)}</h2>
           <table class="weather-table">
             <tbody>
               <tr>
@@ -401,6 +395,23 @@
       return `${escapeHtml(speed.value)}${escapeHtml(speedUnits)}${renderDirection(direction, true)}`;
     }
 
+    function directionDegrees(measurement) {
+      if (!measurement || typeof measurement !== "object") {
+        return 0;
+      }
+
+      const value = Number(firstValue(measurement.value, measurement.val, measurement.amount));
+      if (!Number.isFinite(value)) {
+        return 0;
+      }
+
+      return value;
+    }
+
+    function reverseDirectionDegrees(measurement) {
+      return (directionDegrees(measurement) + 180) % 360;
+    }
+
     function formatDirection(measurement) {
       if (measurement === null || measurement === undefined || measurement === "") {
         return null;
@@ -461,6 +472,10 @@
       return org === "-" && source === "-" ? "NMEA Weather Data" : `${org} ${source}`;
     }
 
+    function popupTitle(weather) {
+      return `Weather at ${formatTitle(weather)}`;
+    }
+
     function firstValue(...values) {
       return values.find((value) => value !== null && value !== undefined && value !== "");
     }
@@ -495,14 +510,27 @@
       `;
     }
 
-    function buildBoatMarker() {
-      return htmlToElement('<div class="map-marker" aria-hidden="true"></div>');
+    function buildBoatMarker(rotationDegrees = 0) {
+      return htmlToElement(`
+        <div class="boat-marker" aria-hidden="true" style="transform: rotate(${escapeHtml(rotationDegrees)}deg);">
+          <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 2 L27 11 L27 31 L9 31 L9 11 Z" fill="#28758a" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M18 7 L22.5 12.5 L13.5 12.5 Z" fill="#ffffff" opacity="0.38"/>
+            <path d="M12 28.5 H24" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+          </svg>
+        </div>
+      `);
     }
 
-    function buildPennantMarker(fillColor, strokeColor) {
-      return htmlToElement(
-        `<div class="map-pennant" aria-hidden="true" style="--pennant-color: ${escapeHtml(fillColor)}; color: ${escapeHtml(strokeColor)};"></div>`
-      );
+    function buildWindwardMarker(rotationDegrees = 0) {
+      return htmlToElement(`
+        <div class="windward-marker" aria-hidden="true" style="transform: rotate(${escapeHtml(rotationDegrees)}deg);">
+          <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 3 L30 20 H23 V33 H13 V20 H6 Z" fill="#c7362f" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M18 8 L24 18 H20.5 V29 H15.5 V18 H12 Z" fill="#8f201b" opacity="0.5"/>
+          </svg>
+        </div>
+      `);
     }
 
     function htmlToElement(html) {
