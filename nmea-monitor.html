@@ -219,7 +219,7 @@
       const title = org === "-" && source === "-" ? "NMEA Weather Data" : `${org} ${source}`;
 
       document.title = title;
-      elements.pageHeading.textContent = title === "NMEA Weather Data" ? title : `Current Weather at ${title}`;
+      elements.pageHeading.textContent = title === "NMEA Weather Data" ? title : `Weather at ${title}`;
     }
 
     function firstValue(...values) {
