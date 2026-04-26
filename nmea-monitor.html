@@ -217,10 +217,10 @@
     function setPageTitle(weather) {
       const org = displayValue(weather.org);
       const source = displayValue(weather.source);
-      const title = org === "-" && source === "-" ? "NMEA Weather Data" : `${org} ${source}`;
+      const title = org === "-" && source === "-" ? "NMEA Weather Data" : `NMEA Weather at ${org} ${source}`;
 
       document.title = title;
-      elements.pageHeading.textContent = title === "NMEA Weather Data" ? title : `Weather at ${title}`;
+      elements.pageHeading.textContent = title;
     }
 
     function firstValue(...values) {
