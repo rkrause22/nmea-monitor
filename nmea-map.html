@@ -141,6 +141,8 @@
 
     let map;
     let marker;
+    let windwardMarker;
+    let startpinMarker;
     let infoWindow;
 
     window.initMap = async function initMap() {
@@ -175,6 +177,17 @@
           marker.setTitle(formatTitle(weather));
         }
 
+        updateFlagMarker("windward", weather.windward, {
+          fillColor: "#f2c94c",
+          strokeColor: "#8f6b00",
+          title: "Windward",
+        });
+        updateFlagMarker("startpin", weather.startpin, {
+          fillColor: "#f2994a",
+          strokeColor: "#a65316",
+          title: "Start Pin",
+        });
+
         if (isInitialLoad) {
           map.setCenter(position);
           map.setZoom(13);
@@ -207,6 +220,70 @@
         throw new Error("Weather response does not contain a valid latitude/longitude.");
       }
       return { lat, lng };
+    }
+
+    function optionalPosition(value) {
+      if (!value || typeof value !== "object") {
+        return null;
+      }
+
+      const lat = Number(value.latitude);
+      const lng = Number(value.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+      }
+
+      return { lat, lng };
+    }
+
+    function updateFlagMarker(kind, value, appearance) {
+      const position = optionalPosition(value);
+      const existingMarker = kind === "windward" ? windwardMarker : startpinMarker;
+
+      if (!position) {
+        if (existingMarker) {
+          existingMarker.setMap(null);
+          if (kind === "windward") {
+            windwardMarker = null;
+          } else {
+            startpinMarker = null;
+          }
+        }
+        return;
+      }
+
+      if (!existingMarker) {
+        const newMarker = new google.maps.Marker({
+          position,
+          map,
+          title: appearance.title,
+          icon: pennantIcon(appearance.fillColor, appearance.strokeColor),
+          zIndex: 2,
+        });
+        if (kind === "windward") {
+          windwardMarker = newMarker;
+        } else {
+          startpinMarker = newMarker;
+        }
+        return;
+      }
+
+      existingMarker.setPosition(position);
+      existingMarker.setTitle(appearance.title);
+      existingMarker.setIcon(pennantIcon(appearance.fillColor, appearance.strokeColor));
+    }
+
+    function pennantIcon(fillColor, strokeColor) {
+      return {
+        path: "M 3 2 L 3 25 M 4 3 L 18 8 L 4 13 Z",
+        fillColor,
+        fillOpacity: 1,
+        strokeColor,
+        strokeWeight: 1.5,
+        scale: 1,
+        anchor: new google.maps.Point(3, 25),
+        labelOrigin: new google.maps.Point(3, 25),
+      };
     }
 
     function renderWeatherCard(weather) {
@@ -408,7 +485,7 @@
   <script
     async
     defer
-    src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_API_KEY&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4CBKRAhjWUsfNFzFxdMyQTjJgVgvGOyQ&callback=initMap">
   </script>
 </body>
 </html>

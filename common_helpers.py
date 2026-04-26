@@ -106,6 +106,10 @@ def format_timespan(value: timedelta) -> str:
     return f"{total_days} day" if total_days == 1 else f"{total_days} days"
 
 
+def datesub(value: datetime, span: str) -> datetime:
+    return value - parse_timespan(span)
+
+
 def log_exception(
     program_name: str,
     script_file: str,

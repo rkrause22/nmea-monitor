@@ -9,6 +9,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 from common_helpers import (
+    datesub,
     format_utc_datetime,
     format_timespan,
     log_error_message,
@@ -407,6 +408,46 @@ def geographic_components(
         cos_latitude * math.sin(longitude_radians),
         math.sin(latitude_radians),
     )
+
+
+def vector_add(
+    latitude_degrees: float,
+    longitude_degrees: float,
+    bearing_degrees: float,
+    range_metres: float,
+) -> tuple[float, float]:
+    earth_radius_metres = 6_371_000.0
+    angular_distance = range_metres / earth_radius_metres
+    latitude_radians = math.radians(latitude_degrees)
+    longitude_radians = math.radians(longitude_degrees)
+    bearing_radians = math.radians(bearing_degrees)
+
+    destination_latitude = math.asin(
+        math.sin(latitude_radians) * math.cos(angular_distance)
+        + math.cos(latitude_radians)
+        * math.sin(angular_distance)
+        * math.cos(bearing_radians)
+    )
+    destination_longitude = longitude_radians + math.atan2(
+        math.sin(bearing_radians)
+        * math.sin(angular_distance)
+        * math.cos(latitude_radians),
+        math.cos(angular_distance)
+        - math.sin(latitude_radians) * math.sin(destination_latitude),
+    )
+    normalized_longitude = (destination_longitude + math.pi) % (2.0 * math.pi) - math.pi
+
+    return (
+        math.degrees(destination_latitude),
+        math.degrees(normalized_longitude),
+    )
+
+
+def rotate(bearing_degrees: float, rotation_degrees: float) -> float:
+    result = (bearing_degrees + rotation_degrees) % 360.0
+    if math.isclose(result, 360.0, abs_tol=1e-9):
+        return 0.0
+    return result
 
 
 def average_direction_degrees(sin_sum: float, cos_sum: float) -> float:

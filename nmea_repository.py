@@ -19,6 +19,7 @@ from nmea_helpers import (
     average_direction_degrees,
     average_geographic_degrees,
     average_value,
+    datesub,
     format_utc_datetime,
     format_timespan,
     log_exception as write_log_exception,
@@ -27,6 +28,8 @@ from nmea_helpers import (
     parse_timespan,
     parse_utc_datetime,
     parse_zda_datetime,
+    rotate,
+    vector_add,
 )
 
 
@@ -303,13 +306,18 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
     
 
     @app.get("/nmea/last/<org>/<source>")
-    @app.get("/nmea/last/<org>/<source>/<int:count>")
-    def get_nmea_latest_messages(org: str, source: str, count: int = 1) -> Response:
-        if count < 1:
-            return json_error("count must be greater than zero", 400)
-
+    @app.get("/nmea/last/<org>/<source>/<what>")
+    def get_nmea_latest_messages(
+        org: str,
+        source: str,
+        what: str | None = None,
+    ) -> Response:
         with session_factory() as session:
-            records = get_latest_messages(session, org, source, count)
+            try:
+                records = get_last_messages(session, org, source, what)
+            except ValueError as exc:
+                log_exception("invalid last parameters", exc)
+                return json_error(str(exc), 400)
 
         if not records:
             return plain_text("", 404)
@@ -459,6 +467,36 @@ def require_bearer_token(req) -> str:
     return token
 
 
+def get_last_messages(
+    session: Session,
+    org: str,
+    source: str,
+    what: str | None = None,
+) -> list[NmeaMessage]:
+    if what is None:
+        return get_latest_messages(session, org, source, 1)
+
+    text = what.strip()
+    if not text:
+        raise ValueError("what must not be empty")
+
+    try:
+        count = int(text)
+    except ValueError:
+        cutoff = datesub(datetime.now(timezone.utc).replace(tzinfo=None), text)
+        return session.scalars(
+            select(NmeaMessage)
+            .where(NmeaMessage.org == org)
+            .where(NmeaMessage.source == source)
+            .where(NmeaMessage.utc >= cutoff)
+            .order_by(NmeaMessage.utc.asc())
+        ).all()
+
+    if count < 1:
+        raise ValueError("count must be greater than zero")
+    return get_latest_messages(session, org, source, count)
+
+
 def parse_keep_value(
     registration: NmeaRegistration,
     what: str | None,
@@ -590,6 +628,8 @@ def build_weather_summary(records: list[NmeaMessage]) -> dict[str, object]:
     wind_direction, wind_direction_units = weather_wind_direction(frame)
     wind_direction_symbol = symbolic_wind_direction(wind_direction)
     wind_speed, wind_speed_units = weather_wind_speed(frame)
+    windward = weather_offset_position(latitude, longitude, wind_direction, 400.0)
+    startpin = weather_startpin_position(latitude, longitude, wind_direction, 100.0)
 
     return {
         "org": records[-1].org,
@@ -610,6 +650,8 @@ def build_weather_summary(records: list[NmeaMessage]) -> dict[str, object]:
             "value": round_weather_value(wind_speed),
             "units": wind_speed_units,
         },
+        "windward": windward,
+        "startpin": startpin,
     }
 
 
@@ -620,6 +662,42 @@ def weather_position(frame: FrameAggregator) -> tuple[float | None, float | None
         frame.gga.position_x_sum,
         frame.gga.position_y_sum,
         frame.gga.position_z_sum,
+    )
+
+
+def weather_offset_position(
+    latitude: float | None,
+    longitude: float | None,
+    bearing: float | None,
+    range_metres: float,
+) -> dict[str, float] | None:
+    if latitude is None or longitude is None or bearing is None:
+        return None
+    new_latitude, new_longitude = vector_add(
+        latitude,
+        longitude,
+        bearing,
+        range_metres,
+    )
+    return {
+        "latitude": new_latitude,
+        "longitude": new_longitude,
+    }
+
+
+def weather_startpin_position(
+    latitude: float | None,
+    longitude: float | None,
+    wind_direction: float | None,
+    range_metres: float,
+) -> dict[str, float] | None:
+    if wind_direction is None:
+        return None
+    return weather_offset_position(
+        latitude,
+        longitude,
+        rotate(wind_direction, -90.0),
+        range_metres,
     )
 
 
