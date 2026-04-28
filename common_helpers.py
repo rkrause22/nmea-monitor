@@ -77,12 +77,20 @@ def parse_timespan(value: str) -> timedelta:
         amount = int(amount_text)
     except ValueError as exc:
         raise ValueError(
-            "span must look like '<number> day(s)', '<number> month(s)', or '<number> year(s)'"
+            "span must look like '<number> second(s)', '<number> minute(s)', "
+            "'<number> hour(s)', '<number> day(s)', '<number> month(s)', "
+            "or '<number> year(s)'"
         ) from exc
 
     if amount < 1:
         raise ValueError("span must be greater than zero")
 
+    if unit in ("second", "seconds"):
+        return timedelta(seconds=amount)
+    if unit in ("minute", "minutes"):
+        return timedelta(minutes=amount)
+    if unit in ("hour", "hours"):
+        return timedelta(hours=amount)
     if unit in ("day", "days"):
         return timedelta(days=amount)
     if unit in ("month", "months"):
@@ -91,7 +99,7 @@ def parse_timespan(value: str) -> timedelta:
         return timedelta(days=amount * 365)
 
     raise ValueError(
-        "span must use day(s), month(s), or year(s) units"
+        "span must use second(s), minute(s), hour(s), day(s), month(s), or year(s) units"
     )
 
 

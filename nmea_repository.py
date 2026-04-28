@@ -343,6 +343,7 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
     ) -> Response:
         start_text = request.args.get("start")
         end_text = request.args.get("end")
+        span_text = request.args.get("span")
 
         statement = (
             select(func.count())
@@ -354,7 +355,7 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
             statement = statement.where(NmeaMessage.source == source)
 
         try:
-            statement = apply_date_filters(statement, start_text, end_text)
+            statement = apply_date_filters(statement, start_text, end_text, span_text)
         except ValueError as exc:
             log_exception("invalid count query parameters", exc)
             return json_error(str(exc), 400)
@@ -369,9 +370,10 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
     def search_nmea_messages(org: str, source: str) -> Response:
         start_text = request.args.get("start")
         end_text = request.args.get("end")
+        span_text = request.args.get("span")
 
         with session_factory() as session:
-            if start_text is None and end_text is None:
+            if start_text is None and end_text is None and span_text is None:
                 records = get_latest_messages(session, org, source)
                 if not records:
                     return plain_text("", 404)
@@ -384,7 +386,7 @@ def create_app(database_url: str = DATABASE_URL) -> Flask:
                 .order_by(NmeaMessage.utc.asc())
             )
             try:
-                statement = apply_date_filters(statement, start_text, end_text)
+                statement = apply_date_filters(statement, start_text, end_text, span_text)
             except ValueError as exc:
                 log_exception("invalid search query parameters", exc)
                 return json_error(str(exc), 400)
@@ -589,7 +591,19 @@ def purge_messages_for_source(
     ).rowcount or 0
 
 
-def apply_date_filters(statement, start_text: str | None, end_text: str | None):
+def apply_date_filters(
+    statement,
+    start_text: str | None,
+    end_text: str | None,
+    span_text: str | None = None,
+):
+    if span_text is not None:
+        text = span_text.strip()
+        if not text:
+            raise ValueError("span must not be empty")
+        statement = statement.where(
+            NmeaMessage.utc >= datesub(datetime.now(timezone.utc).replace(tzinfo=None), text)
+        )
     if start_text is not None:
         start, _ = parse_query_time_range(start_text)
         statement = statement.where(NmeaMessage.utc >= start)
