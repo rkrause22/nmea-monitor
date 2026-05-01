@@ -162,30 +162,6 @@ class FileStore(RepositoryStore):
             deleted += 1
         return deleted
 
-    def get_volume(
-        self,
-        org: str | None = None,
-        source: str | None = None,
-    ) -> int:
-        if source is not None and org is None:
-            raise ValueError("org is required when source is provided")
-
-        if org is not None and source is not None:
-            return len(
-                self._available_days(
-                    self._normalize_org_name(org),
-                    self._normalize_source_name(source),
-                )
-            )
-
-        target_root = self.messages_root
-        if org is not None:
-            target_root = self.messages_root / self._normalize_org_name(org)
-
-        if not target_root.exists():
-            return 0
-        return self._count_day_files(target_root)
-
     # Registration operations
     def add_registration(
         self,
@@ -237,7 +213,7 @@ class FileStore(RepositoryStore):
         if registration_payload is None:
             return 0
 
-        deleted_volume = self.get_volume(org)
+        deleted_files = self._count_stored_files(self.messages_root / org)
         registrations.pop(org, None)
         self._save_registrations(registrations)
         org_folder = self.messages_root / org
@@ -254,7 +230,7 @@ class FileStore(RepositoryStore):
                     path.rmdir()
             if org_folder.exists():
                 org_folder.rmdir()
-        return deleted_volume
+        return deleted_files
 
     def get_registrations(
         self,
@@ -428,6 +404,11 @@ class FileStore(RepositoryStore):
             if path.name.endswith(NMEA_SUFFIX) or path.name.endswith(GZIP_SUFFIX):
                 count += 1
         return count
+
+    def _count_stored_files(self, root: Path) -> int:
+        if not root.exists():
+            return 0
+        return self._count_day_files(root)
 
     def _date_from_path(self, path: Path) -> date | None:
         name = path.name

@@ -115,11 +115,11 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
             registration = service.get_registration(auth, org)
             if registration is None:
                 return json_error("registration not found", 404)
-            deleted_volume = service.delete_registration(auth, org)
+            deleted_files = service.delete_registration(auth, org)
         except ValueError as exc:
             return handle_value_error("invalid delete registration request", exc)
 
-        return jsonify({"status": "deleted", "volume_deleted": deleted_volume}), 200
+        return jsonify({"status": "deleted", "files_deleted": deleted_files}), 200
 
     @app.delete("/nmea/purge/<org>/<source>")
     @app.delete("/nmea/purge/<org>/<source>/<what>")
@@ -134,11 +134,11 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
             return handle_value_error("invalid purge authorization", exc)
 
         try:
-            deleted_volume = service.purge_stale_data(auth, org, source, what)
+            deleted_files = service.purge_stale_data(auth, org, source, what)
         except ValueError as exc:
             return handle_value_error("invalid purge request", exc)
 
-        return jsonify({"status": "deleted", "volume_deleted": deleted_volume}), 200
+        return jsonify({"status": "deleted", "files_deleted": deleted_files}), 200
 
     @app.get("/nmea/last/<org>/<source>")
     @app.get("/nmea/last/<org>/<source>/<what>")

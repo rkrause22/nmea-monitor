@@ -68,13 +68,6 @@ class RepositoryStore(Protocol):
     ) -> int:
         """Delete stale stored volume for one org/source and return the delete count."""
 
-    def get_volume(
-        self,
-        org: str | None = None,
-        source: str | None = None,
-    ) -> int:
-        """Return the amount of stored volume overall or within an org/source."""
-
     # Registration operations
     def add_registration(
         self,

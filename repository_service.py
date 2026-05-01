@@ -75,13 +75,6 @@ class RepositoryService:
         self._require_org_access(org, auth)
         return self.store.purge_stale_data(org, source, what)
 
-    def get_volume(
-        self,
-        org: str | None = None,
-        source: str | None = None,
-    ) -> int:
-        return self.store.get_volume(org, source)
-
     # Registration operations
     def add_registration(
         self,
