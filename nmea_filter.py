@@ -16,16 +16,18 @@ from collections import deque
 from functools import partial
 from typing import Iterable, Optional
 
-from nmea_helpers import (
+from nmea_aggregation import (
     FrameAggregator,
     NMEAError,
     NMEASentence,
     combine_frames,
+    parse_sentence,
+    parse_zda_datetime,
+)
+from common_helpers import (
     format_utc_datetime,
     log_error_message as write_log_error_message,
     log_exception as write_log_exception,
-    parse_sentence,
-    parse_zda_datetime,
 )
 
 try:
@@ -550,7 +552,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-u",
         "--url",
-        help="URL where filtered and aggregated NMEA output should be uploaded (eg. https://nmea.myorg.com/add/myorg/mydevice)",
+        help="URL where filtered and aggregated NMEA output should be uploaded (eg. https://nmea.myorg.com/nmea/add/myorg/mydevice)",
     )
     parser.add_argument(
         "--scan-timeout",

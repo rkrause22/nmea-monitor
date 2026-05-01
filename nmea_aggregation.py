@@ -9,14 +9,10 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 from common_helpers import (
-    datesub,
-    format_utc_datetime,
-    format_timespan,
-    log_error_message,
-    log_exception,
-    parse_query_time_range,
-    parse_timespan,
-    parse_utc_datetime,
+    average_direction_degrees,
+    average_geographic_degrees,
+    average_value,
+    decimal_from_float,
 )
 
 
@@ -410,74 +406,6 @@ def geographic_components(
     )
 
 
-def vector_add(
-    latitude_degrees: float,
-    longitude_degrees: float,
-    bearing_degrees: float,
-    range_metres: float,
-) -> tuple[float, float]:
-    earth_radius_metres = 6_371_000.0
-    angular_distance = range_metres / earth_radius_metres
-    latitude_radians = math.radians(latitude_degrees)
-    longitude_radians = math.radians(longitude_degrees)
-    bearing_radians = math.radians(bearing_degrees)
-
-    destination_latitude = math.asin(
-        math.sin(latitude_radians) * math.cos(angular_distance)
-        + math.cos(latitude_radians)
-        * math.sin(angular_distance)
-        * math.cos(bearing_radians)
-    )
-    destination_longitude = longitude_radians + math.atan2(
-        math.sin(bearing_radians)
-        * math.sin(angular_distance)
-        * math.cos(latitude_radians),
-        math.cos(angular_distance)
-        - math.sin(latitude_radians) * math.sin(destination_latitude),
-    )
-    normalized_longitude = (destination_longitude + math.pi) % (2.0 * math.pi) - math.pi
-
-    return (
-        math.degrees(destination_latitude),
-        math.degrees(normalized_longitude),
-    )
-
-
-def rotate(bearing_degrees: float, rotation_degrees: float) -> float:
-    result = (bearing_degrees + rotation_degrees) % 360.0
-    if math.isclose(result, 360.0, abs_tol=1e-9):
-        return 0.0
-    return result
-
-
-def average_direction_degrees(sin_sum: float, cos_sum: float) -> float:
-    if math.hypot(sin_sum, cos_sum) < 1e-12:
-        return 0.0
-    degrees = math.degrees(math.atan2(sin_sum, cos_sum)) % 360.0
-    return round_direction_degrees(degrees)
-
-
-def round_direction_degrees(value: float, increment: float = 5.0) -> float:
-    rounded = round(value / increment) * increment
-    rounded %= 360.0
-    if math.isclose(rounded, 360.0, abs_tol=1e-9):
-        return 0.0
-    return rounded
-
-
-def average_geographic_degrees(
-    x_sum: float,
-    y_sum: float,
-    z_sum: float,
-) -> tuple[float, float]:
-    horizontal = math.hypot(x_sum, y_sum)
-    if math.hypot(horizontal, z_sum) < 1e-12:
-        return 0.0, 0.0
-    latitude = math.degrees(math.atan2(z_sum, horizontal))
-    longitude = math.degrees(math.atan2(y_sum, x_sum))
-    return latitude, longitude
-
-
 def average_mda_field(aggregator: MDAAggregator, field_index: int) -> float:
     if field_index in (7, 8):
         return average_direction_degrees(
@@ -509,14 +437,6 @@ def format_rounded_average(total: float, count: int, places: int) -> str:
 def format_rounded_average_int(total: float, count: int) -> int:
     average = decimal_from_float(total) / Decimal(count)
     return int(average.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def average_value(total: float, count: int) -> float:
-    return float(decimal_from_float(total) / Decimal(count))
-
-
-def decimal_from_float(value: float) -> Decimal:
-    return Decimal(str(value)).quantize(Decimal("0.000000001"), rounding=ROUND_HALF_UP)
 
 
 def parse_optional_float(value: str, field_name: str) -> Optional[float]:

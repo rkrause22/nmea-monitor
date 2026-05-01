@@ -1,0 +1,131 @@
+"""Service-layer authorization and orchestration for repository backends."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from common_helpers import datesub
+from repository_store import MessageRecord, RegistrationRecord, RepositoryStore
+
+
+class RepositoryService:
+    def __init__(self, store: RepositoryStore) -> None:
+        self.store = store
+
+    # Message operations
+    def add_message(
+        self,
+        auth: str,
+        org: str,
+        source: str,
+        record: MessageRecord,
+    ) -> bool:
+        self._require_org_access(org, auth)
+        return self.store.add_message(org, source, record)
+
+    def find_messages(
+        self,
+        org: str,
+        source: str,
+        start=None,
+        end=None,
+        count: int | None = None,
+    ) -> list[MessageRecord]:
+        return self.store.find_messages(org, source, start, end, count)
+
+    def count_messages(
+        self,
+        org: str | None = None,
+        source: str | None = None,
+        start=None,
+        end=None,
+    ) -> int:
+        return self.store.count_messages(org, source, start, end)
+
+    def get_latest_messages(
+        self,
+        org: str,
+        source: str,
+        what: str | None = None,
+    ) -> list[MessageRecord]:
+        if what is None:
+            return self.store.find_messages(org, source, count=1)
+
+        text = what.strip()
+        if not text:
+            raise ValueError("what must not be empty")
+
+        try:
+            count = int(text)
+        except ValueError:
+            start = datesub(datetime.now(timezone.utc).replace(tzinfo=None), text)
+            return self.store.find_messages(org, source, start=start)
+
+        if count < 1:
+            raise ValueError("count must be greater than zero")
+        return self.store.find_messages(org, source, count=count)
+
+    def purge_stale_data(
+        self,
+        auth: str,
+        org: str,
+        source: str,
+        what: str | None = None,
+    ) -> int:
+        self._require_org_access(org, auth)
+        return self.store.purge_stale_data(org, source, what)
+
+    def get_volume(
+        self,
+        org: str | None = None,
+        source: str | None = None,
+    ) -> int:
+        return self.store.get_volume(org, source)
+
+    # Registration operations
+    def add_registration(
+        self,
+        auth: str,
+        registration: RegistrationRecord,
+    ) -> bool:
+        if not auth:
+            raise ValueError("access denied")
+
+        admin_registration = self.store.get_registration("admin")
+        if admin_registration is None:
+            if registration.org.lower() != "admin":
+                raise ValueError("access denied")
+            if auth != registration.auth:
+                raise ValueError("access denied")
+        else:
+            self._require_admin_access(auth)
+        return self.store.add_registration(registration)
+
+    def delete_registration(self, auth: str, org: str) -> int:
+        self._require_admin_access(auth)
+        return self.store.delete_registration(org)
+
+    def get_registration(self, auth: str, org: str) -> RegistrationRecord | None:
+        self._require_admin_access(auth)
+        return self.store.get_registration(org)
+
+    def get_registrations(
+        self,
+        auth: str,
+        org: str | None = None,
+    ) -> list[RegistrationRecord]:
+        self._require_admin_access(auth)
+        return self.store.get_registrations(org)
+
+    def _require_admin_access(self, auth: str) -> None:
+        admin_registration = self.store.get_registration("admin")
+        if admin_registration is None:
+            raise ValueError("access denied")
+        if not self.store.authenticate("admin", auth):
+            raise ValueError("access denied")
+
+    def _require_org_access(self, org: str, auth: str) -> None:
+        if self.store.get_registration(org) is None:
+            raise ValueError("registration not found")
+        if not self.store.authenticate(org, auth):
+            raise ValueError("access denied")

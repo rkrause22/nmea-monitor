@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import traceback
+import math
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 
@@ -116,6 +118,112 @@ def format_timespan(value: timedelta) -> str:
 
 def datesub(value: datetime, span: str) -> datetime:
     return value - parse_timespan(span)
+
+
+def apply_date_filters(
+    start_text: str | None,
+    end_text: str | None,
+    span_text: str | None = None,
+) -> tuple[datetime | None, datetime | None]:
+    start: datetime | None = None
+    end: datetime | None = None
+
+    if span_text is not None:
+        text = span_text.strip()
+        if not text:
+            raise ValueError("span must not be empty")
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        if text.lower() == "today":
+            start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            start = datesub(now_utc, text)
+
+    if start_text is not None:
+        query_start, _ = parse_query_time_range(start_text)
+        start = query_start if start is None else max(start, query_start)
+
+    if end_text is not None:
+        _, end = parse_query_time_range(end_text)
+
+    if start is not None and end is not None and start >= end:
+        return end, end
+    return start, end
+
+
+def vector_add(
+    latitude_degrees: float,
+    longitude_degrees: float,
+    bearing_degrees: float,
+    range_metres: float,
+) -> tuple[float, float]:
+    earth_radius_metres = 6_371_000.0
+    angular_distance = range_metres / earth_radius_metres
+    latitude_radians = math.radians(latitude_degrees)
+    longitude_radians = math.radians(longitude_degrees)
+    bearing_radians = math.radians(bearing_degrees)
+
+    destination_latitude = math.asin(
+        math.sin(latitude_radians) * math.cos(angular_distance)
+        + math.cos(latitude_radians)
+        * math.sin(angular_distance)
+        * math.cos(bearing_radians)
+    )
+    destination_longitude = longitude_radians + math.atan2(
+        math.sin(bearing_radians)
+        * math.sin(angular_distance)
+        * math.cos(latitude_radians),
+        math.cos(angular_distance)
+        - math.sin(latitude_radians) * math.sin(destination_latitude),
+    )
+    normalized_longitude = (destination_longitude + math.pi) % (2.0 * math.pi) - math.pi
+
+    return (
+        math.degrees(destination_latitude),
+        math.degrees(normalized_longitude),
+    )
+
+
+def rotate(bearing_degrees: float, rotation_degrees: float) -> float:
+    result = (bearing_degrees + rotation_degrees) % 360.0
+    if math.isclose(result, 360.0, abs_tol=1e-9):
+        return 0.0
+    return result
+
+
+def average_direction_degrees(sin_sum: float, cos_sum: float) -> float:
+    if math.hypot(sin_sum, cos_sum) < 1e-12:
+        return 0.0
+    degrees = math.degrees(math.atan2(sin_sum, cos_sum)) % 360.0
+    return round_direction_degrees(degrees)
+
+
+def round_direction_degrees(value: float, increment: float = 5.0) -> float:
+    rounded = round(value / increment) * increment
+    rounded %= 360.0
+    if math.isclose(rounded, 360.0, abs_tol=1e-9):
+        return 0.0
+    return rounded
+
+
+def average_geographic_degrees(
+    x_sum: float,
+    y_sum: float,
+    z_sum: float,
+) -> tuple[float, float]:
+    horizontal = math.hypot(x_sum, y_sum)
+    if math.hypot(horizontal, z_sum) < 1e-12:
+        return 0.0, 0.0
+    latitude = math.degrees(math.atan2(z_sum, horizontal))
+    longitude = math.degrees(math.atan2(y_sum, x_sum))
+    return latitude, longitude
+
+
+def average_value(total: float, count: int) -> float:
+    return float(decimal_from_float(total) / Decimal(count))
+
+
+def decimal_from_float(value: float) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.000000001"), rounding=ROUND_HALF_UP)
 
 
 def log_exception(
