@@ -168,8 +168,8 @@
   </main>
 
   <script>
-    const WEATHER_URL = "/nmea/weather/WSC/Barge";
     const REFRESH_INTERVAL_MS = 10000;
+    const PAGE_QUERY = new URLSearchParams(window.location.search);
 
     const elements = {
       pageHeading: document.getElementById("page-heading"),
@@ -179,8 +179,15 @@
       status: document.getElementById("status"),
     };
 
-    updateWeather();
-    setInterval(updateWeather, REFRESH_INTERVAL_MS);
+    const requestConfig = readRequestConfig();
+
+    if (!requestConfig.org || !requestConfig.source) {
+      setStatus("Add ?org=<org>&src=<source> to the page URL.", true);
+    } else {
+      elements.pageHeading.textContent = `NMEA Weather at ${requestConfig.org} ${requestConfig.source}`;
+      updateWeather();
+      setInterval(updateWeather, requestConfig.refreshIntervalMs);
+    }
 
     async function updateWeather() {
       try {
@@ -193,7 +200,7 @@
     }
 
     async function fetchWeather() {
-      const response = await fetch(WEATHER_URL, {
+      const response = await fetch(weatherUrl(requestConfig), {
         headers: { Accept: "application/json" },
       });
 
@@ -221,6 +228,36 @@
 
       document.title = title;
       elements.pageHeading.textContent = title;
+    }
+
+    function weatherUrl(config) {
+      return `/nmea/weather/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}`;
+    }
+
+    function readRequestConfig() {
+      return {
+        org: firstQueryValue("org"),
+        source: firstQueryValue("src", "source"),
+        refreshIntervalMs: readRefreshIntervalMs(),
+      };
+    }
+
+    function firstQueryValue(...keys) {
+      for (const key of keys) {
+        const value = PAGE_QUERY.get(key);
+        if (value && value.trim()) {
+          return value.trim();
+        }
+      }
+      return "";
+    }
+
+    function readRefreshIntervalMs() {
+      const value = Number(PAGE_QUERY.get("rate"));
+      if (!Number.isFinite(value) || value <= 0) {
+        return REFRESH_INTERVAL_MS;
+      }
+      return value * 1000;
     }
 
     function firstValue(...values) {

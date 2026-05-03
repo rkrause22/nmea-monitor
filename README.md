@@ -38,7 +38,7 @@ Endpoints:
 * `GET /nmea/registrations`
   Returns all registrations, including each organization's retention span and retention limit. Requires the admin bearer token.
 * `GET /nmea/registrations/<org>`
-  Returns registrations whose organization name starts with the given prefix. Requires the admin bearer token.
+  Returns the registration for the given organization. This endpoint does not require authentication.
 * `DELETE /nmea/registrations/<org>`
   Deletes the specified registration and all stored messages for that organization. Returns `volume_deleted`, which is the number of stored daily files removed. Requires the admin bearer token.
 * `DELETE /nmea/purge/<org>/<source>`
@@ -55,8 +55,10 @@ Endpoints:
   Returns the number of stored messages for the given organization, optionally filtered by `start`, `end`, and `span`.
 * `GET /nmea/count/<org>/<source>`
   Returns the number of stored messages for the given organization and source, optionally filtered by `start`, `end`, and `span`. This count is the number of stored message records, meaning the number of JSONL lines that match the filter.
-* `GET /nmea/search/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
+* `GET /nmea/find/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
   Returns matching stored messages for the given `org/source`, optionally filtered by a date/time range and/or span. If no filter is supplied, it returns the latest message.
+* `GET /nmea/history/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
+  Returns plot-ready wind history for the given `org/source` as JSON, optionally filtered by a date/time range and/or span. When only `span` is supplied, the trailing window is anchored to the latest stored record rather than current wall-clock time, so somewhat stale feeds still return history. The response includes `org`, `source`, the supplied filter values, and a `samples` array ordered from oldest to newest.
 * `GET /nmea/weather/<org>/<source>`
   Returns a weather-oriented summary view derived from the most recent stored message(s) for the `org/source`.
 * `GET /nmea/weather/<org>/<source>/<count>`

@@ -29,6 +29,7 @@ class RegistrationRecord:
     auth: str
     span: str
     limit: int
+    gkey: str = ""
 
 
 class RepositoryStore(Protocol):

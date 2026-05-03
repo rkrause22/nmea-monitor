@@ -173,6 +173,7 @@ class FileStore(RepositoryStore):
             auth=registration.auth,
             span=registration.span,
             limit=registration.limit,
+            gkey=registration.gkey,
         )
         if len(registration.auth) < 8:
             raise ValueError("registration auth must be at least 8 characters")
@@ -490,6 +491,7 @@ class FileStore(RepositoryStore):
             return None
         span = payload.get("span")
         limit = payload.get("limit")
+        gkey = payload.get("gkey")
         if not isinstance(span, str):
             return None
         if not isinstance(limit, int) or isinstance(limit, bool):
@@ -499,6 +501,7 @@ class FileStore(RepositoryStore):
             auth="",
             span=span,
             limit=limit,
+            gkey=gkey if isinstance(gkey, str) else "",
         )
 
     def _cutoff_date_for_span(self, span_text: str) -> date:
@@ -522,6 +525,7 @@ class FileStore(RepositoryStore):
             "auth_salt": salt,
             "span": registration.span,
             "limit": registration.limit,
+            "gkey": registration.gkey,
         }
 
     def _get_registration_payload(

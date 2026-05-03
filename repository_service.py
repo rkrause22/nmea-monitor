@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timedelta
 
 from common_helpers import datesub
 from repository_store import MessageRecord, RegistrationRecord, RepositoryStore
@@ -48,8 +48,9 @@ class RepositoryService:
         source: str,
         what: str | None = None,
     ) -> list[MessageRecord]:
-        if what is None:
-            return self.store.find_messages(org, source, count=1)
+        latest_records = self.store.find_messages(org, source, count=1)
+        if what is None or not latest_records:
+            return latest_records
 
         text = what.strip()
         if not text:
@@ -58,12 +59,29 @@ class RepositoryService:
         try:
             count = int(text)
         except ValueError:
-            start = datesub(datetime.now(timezone.utc).replace(tzinfo=None), text)
+            start = datesub(latest_records[-1].utc, text)
             return self.store.find_messages(org, source, start=start)
 
         if count < 1:
             raise ValueError("count must be greater than zero")
         return self.store.find_messages(org, source, count=count)
+
+    def get_history(
+        self,
+        org: str,
+        source: str,
+        start=None,
+        end=None,
+        span: str | None = None,
+    ) -> list[MessageRecord]:
+        if span is not None and start is None and end is None:
+            latest_records = self.store.find_messages(org, source, count=1)
+            if not latest_records:
+                return []
+            latest_utc = latest_records[-1].utc
+            start = datesub(latest_utc, span)
+            end = latest_utc + timedelta(microseconds=1)
+        return self.store.find_messages(org, source, start=start, end=end)
 
     def purge_stale_data(
         self,
@@ -97,6 +115,9 @@ class RepositoryService:
     def delete_registration(self, auth: str, org: str) -> int:
         self._require_admin_access(auth)
         return self.store.delete_registration(org)
+
+    def lookup_registration(self, org: str) -> RegistrationRecord | None:
+        return self.store.get_registration(org)
 
     def get_registration(self, auth: str, org: str) -> RegistrationRecord | None:
         self._require_admin_access(auth)

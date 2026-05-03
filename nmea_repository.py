@@ -15,6 +15,7 @@ from common_helpers import (
     parse_timespan,
     parse_utc_datetime,
 )
+from nmea_history import build_history_summary
 from nmea_weather import build_weather_summary
 from repository_store_by_file import FileStore
 from repository_service import RepositoryService
@@ -81,15 +82,14 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
         return jsonify({"status": "created"}), 201
 
     @app.get("/nmea/registrations")
-    @app.get("/nmea/registrations/<org>")
-    def get_registrations(org: str | None = None) -> Response:
+    def get_registrations() -> Response:
         try:
             auth = require_bearer_token(request)
         except ValueError as exc:
             return handle_value_error("invalid registrations authorization", exc)
 
         try:
-            registrations = service.get_registrations(auth, org)
+            registrations = service.get_registrations(auth)
         except ValueError as exc:
             return handle_value_error("invalid registrations request", exc)
 
@@ -99,9 +99,29 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
                     "org": registration.org,
                     "span": registration.span,
                     "limit": registration.limit,
+                    "gkey": registration.gkey,
                 }
                 for registration in registrations
             ]
+        )
+
+    @app.get("/nmea/registrations/<org>")
+    def get_registration(org: str) -> Response:
+        try:
+            registration = service.lookup_registration(org)
+        except ValueError as exc:
+            return handle_value_error("invalid registration request", exc)
+
+        if registration is None:
+            return json_error("registration not found", 404)
+
+        return jsonify(
+            {
+                "org": registration.org,
+                "span": registration.span,
+                "limit": registration.limit,
+                "gkey": registration.gkey,
+            }
         )
 
     @app.delete("/nmea/registrations/<org>")
@@ -175,8 +195,8 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
 
         return plain_text(str(count))
 
-    @app.get("/nmea/search/<org>/<source>")
-    def search_nmea_messages(org: str, source: str) -> Response:
+    @app.get("/nmea/find/<org>/<source>")
+    def find_nmea_messages(org: str, source: str) -> Response:
         start_text = request.args.get("start")
         end_text = request.args.get("end")
         span_text = request.args.get("span")
@@ -188,11 +208,35 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
             else:
                 records = service.find_messages(org, source, start=start, end=end)
         except ValueError as exc:
-            return handle_value_error("invalid search query parameters", exc)
+            return handle_value_error("invalid find query parameters", exc)
 
         if not records:
             return plain_text("", 404)
         return plain_text("\n".join(record.sentence_text for record in records))
+
+    @app.get("/nmea/history/<org>/<source>")
+    def get_nmea_history(org: str, source: str) -> Response:
+        start_text = request.args.get("start")
+        end_text = request.args.get("end")
+        span_text = request.args.get("span")
+
+        try:
+            if start_text is None and end_text is None:
+                records = service.get_history(org, source, span=span_text)
+            else:
+                start, end = apply_date_filters(start_text, end_text, span_text)
+                records = service.get_history(org, source, start=start, end=end)
+        except ValueError as exc:
+            return handle_value_error("invalid history query parameters", exc)
+
+        if not records:
+            return jsonify({"error": "no records found"}), 404
+
+        history = build_history_summary(org, source, records, log_exception)
+        history["start"] = start_text
+        history["end"] = end_text
+        history["span"] = span_text
+        return jsonify(history)
 
     @app.get("/nmea/weather/<org>/<source>")
     @app.get("/nmea/weather/<org>/<source>/<int:count>")
@@ -277,11 +321,20 @@ def registration_record_from_payload(payload: dict[str, object]) -> Registration
     if limit < 1:
         raise ValueError("limit must be greater than zero")
 
+    gkey_value = payload.get("gkey")
+    if gkey_value is None:
+        gkey = ""
+    elif not isinstance(gkey_value, str):
+        raise ValueError("gkey must be a string when provided")
+    else:
+        gkey = gkey_value.strip()
+
     return RegistrationRecord(
         org=org_value.strip(),
         auth=auth_value,
         span=span,
         limit=limit,
+        gkey=gkey,
     )
 
 

@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Polar Wind Plot</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #17212b;
+      background: #f4f7f9;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 28px 24px 36px;
+      background: #f4f7f9;
+      color: #17212b;
+      font-family: inherit;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      text-align: center;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .subheading {
+      margin: 0 0 22px;
+      text-align: center;
+      color: #4c5a67;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .secondary-grid {
+      margin-top: 12px;
+    }
+
+    .metric-card {
+      min-height: 92px;
+      padding: 14px 16px;
+      background: #ffffff;
+      border: 1px solid #d9dee5;
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+    }
+
+    .metric-label {
+      margin: 0 0 8px;
+      color: #4c5a67;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .metric-detail {
+      margin: 8px 0 0;
+      color: #6a7886;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .plot-panel {
+      background: #ffffff;
+      border: 1px solid #d9dee5;
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+      overflow: hidden;
+    }
+
+    .plot-frame {
+      width: 100%;
+      min-height: 720px;
+      padding: 10px 10px 0;
+    }
+
+    .plot-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .plot-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px 14px;
+      border-top: 1px solid #d9dee5;
+      color: #4c5a67;
+      font-size: 14px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .legend-line {
+      width: 26px;
+      height: 0;
+      border-top-width: 3px;
+      border-top-style: solid;
+    }
+
+    .legend-line.raw {
+      border-top-color: rgb(177 183 192 / 70%);
+    }
+
+    .legend-line.avg {
+      border-top-color: #54e36f;
+    }
+
+    .legend-line.mean {
+      border-top-color: #de4b52;
+    }
+
+    .status {
+      min-height: 20px;
+      color: #d9dee5;
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .status.error {
+      color: #a12622;
+    }
+
+    .muted {
+      color: #6a7886;
+    }
+
+    @media (max-width: 920px) {
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .plot-frame {
+        min-height: 580px;
+      }
+
+      .plot-footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .status {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 18px 16px 28px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .plot-frame {
+        min-height: 460px;
+        padding: 8px 6px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="page-heading">Polar Wind Plot</h1>
+    <p id="subheading" class="subheading">Awaiting history request</p>
+
+    <section class="summary-grid" aria-label="Wind summary">
+      <article class="metric-card">
+        <p class="metric-label">Mean Wind</p>
+        <p id="mean-wind" class="metric-value">-</p>
+        <p id="mean-wind-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Current Wind</p>
+        <p id="current-wind" class="metric-value">-</p>
+        <p id="current-wind-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Oscillation</p>
+        <p id="oscillation" class="metric-value">-</p>
+        <p id="oscillation-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Recent Shift</p>
+        <p id="shift" class="metric-value">-</p>
+        <p id="shift-detail" class="metric-detail">-</p>
+      </article>
+    </section>
+
+    <section class="plot-panel" aria-label="Polar wind plot">
+      <div id="plot-frame" class="plot-frame"></div>
+      <div class="plot-footer">
+        <div class="legend" aria-hidden="true">
+          <span class="legend-item"><span class="legend-line raw"></span><span>Samples</span></span>
+          <span class="legend-item"><span class="legend-line avg"></span><span>Rolling average</span></span>
+          <span class="legend-item"><span class="legend-line mean"></span><span>Mean direction</span></span>
+        </div>
+        <div id="status" class="status">Loading history...</div>
+      </div>
+    </section>
+
+    <section class="summary-grid secondary-grid" aria-label="Pressure summary">
+      <article class="metric-card">
+        <p class="metric-label">Mean Pressure</p>
+        <p id="mean-pressure" class="metric-value">-</p>
+        <p id="mean-pressure-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Current Pressure</p>
+        <p id="current-pressure" class="metric-value">-</p>
+        <p id="current-pressure-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Variability</p>
+        <p id="pressure-analysis" class="metric-value">-</p>
+        <p id="pressure-analysis-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Trend</p>
+        <p id="pressure-trend" class="metric-value">-</p>
+        <p id="pressure-trend-detail" class="metric-detail">-</p>
+      </article>
+    </section>
+
+    <section class="summary-grid secondary-grid" aria-label="Temperature summary">
+      <article class="metric-card">
+        <p class="metric-label">Mean Temperature</p>
+        <p id="mean-temperature" class="metric-value">-</p>
+        <p id="mean-temperature-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Current Temperature</p>
+        <p id="current-temperature" class="metric-value">-</p>
+        <p id="current-temperature-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Variability</p>
+        <p id="temperature-analysis" class="metric-value">-</p>
+        <p id="temperature-analysis-detail" class="metric-detail">-</p>
+      </article>
+      <article class="metric-card">
+        <p class="metric-label">Trend</p>
+        <p id="temperature-trend" class="metric-value">-</p>
+        <p id="temperature-trend-detail" class="metric-detail">-</p>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const DEFAULT_SPAN = "30-minutes";
+    const REFRESH_INTERVAL_MS = 60000;
+    const PAGE_QUERY = new URLSearchParams(window.location.search);
+
+    const elements = {
+      heading: document.getElementById("page-heading"),
+      subheading: document.getElementById("subheading"),
+      meanWind: document.getElementById("mean-wind"),
+      meanWindDetail: document.getElementById("mean-wind-detail"),
+      currentWind: document.getElementById("current-wind"),
+      currentWindDetail: document.getElementById("current-wind-detail"),
+      oscillation: document.getElementById("oscillation"),
+      oscillationDetail: document.getElementById("oscillation-detail"),
+      shift: document.getElementById("shift"),
+      shiftDetail: document.getElementById("shift-detail"),
+      meanPressure: document.getElementById("mean-pressure"),
+      meanPressureDetail: document.getElementById("mean-pressure-detail"),
+      currentPressure: document.getElementById("current-pressure"),
+      currentPressureDetail: document.getElementById("current-pressure-detail"),
+      pressureAnalysis: document.getElementById("pressure-analysis"),
+      pressureAnalysisDetail: document.getElementById("pressure-analysis-detail"),
+      pressureTrend: document.getElementById("pressure-trend"),
+      pressureTrendDetail: document.getElementById("pressure-trend-detail"),
+      meanTemperature: document.getElementById("mean-temperature"),
+      meanTemperatureDetail: document.getElementById("mean-temperature-detail"),
+      currentTemperature: document.getElementById("current-temperature"),
+      currentTemperatureDetail: document.getElementById("current-temperature-detail"),
+      temperatureAnalysis: document.getElementById("temperature-analysis"),
+      temperatureAnalysisDetail: document.getElementById("temperature-analysis-detail"),
+      temperatureTrend: document.getElementById("temperature-trend"),
+      temperatureTrendDetail: document.getElementById("temperature-trend-detail"),
+      plotFrame: document.getElementById("plot-frame"),
+      status: document.getElementById("status"),
+    };
+
+    const requestConfig = readRequestConfig();
+
+    if (!requestConfig.org || !requestConfig.source) {
+      setStatus("Add ?org=<org>&src=<source> to the page URL.", true);
+      elements.subheading.textContent = "Query string required";
+    } else {
+      elements.heading.textContent = `Polar Wind at ${requestConfig.org} ${requestConfig.source}`;
+      elements.subheading.textContent = `${requestConfig.span} window`;
+      refreshHistory();
+      setInterval(refreshHistory, requestConfig.refreshIntervalMs);
+    }
+
+    async function refreshHistory() {
+      try {
+        const history = await fetchHistory();
+        const samples = extractWindSamples(history.samples || []);
+        if (!samples.length) {
+          throw new Error("History response did not contain any wind samples.");
+        }
+
+        renderHistory(history, samples);
+        setStatus(`Updated ${formatLocalDateTime(new Date())}`);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
+    async function fetchHistory() {
+      const response = await fetch(historyUrl(requestConfig), {
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`History request failed: HTTP ${response.status}`);
+      }
+
+      return response.json();
+    }
+
+    function renderHistory(history, samples) {
+      const title = `Polar Wind at ${displayValue(history.org)} ${displayValue(history.source)}`;
+      document.title = title;
+      elements.heading.textContent = title;
+      elements.subheading.textContent = describeWindow(history, samples, history.span || requestConfig.span);
+      renderAnalysis(history.analysis || {});
+
+      const meanDirection = measurementValue(history.analysis?.wind?.mean?.direction);
+
+      elements.plotFrame.innerHTML = renderPlotSvg(samples, {
+        meanDirection: Number.isFinite(meanDirection) ? meanDirection : 0,
+      });
+    }
+
+    function renderAnalysis(analysis) {
+      const wind = analysis.wind || {};
+      const pressure = analysis.pressure || {};
+      const temperature = analysis.temperature || {};
+
+      elements.meanWind.textContent = displayValue(wind.mean?.headline);
+      elements.meanWindDetail.textContent = displayValue(wind.mean?.detail);
+      elements.currentWind.textContent = displayValue(wind.current?.headline);
+      elements.currentWindDetail.textContent = displayValue(wind.current?.detail);
+      elements.oscillation.textContent = displayValue(wind.analysis?.headline);
+      elements.oscillationDetail.textContent = displayValue(wind.analysis?.detail);
+      elements.shift.textContent = displayValue(wind.trend?.headline);
+      elements.shiftDetail.textContent = displayValue(wind.trend?.detail);
+
+      elements.meanPressure.textContent = displayValue(pressure.mean?.headline);
+      elements.meanPressureDetail.textContent = displayValue(pressure.mean?.detail);
+      elements.currentPressure.textContent = displayValue(pressure.current?.headline);
+      elements.currentPressureDetail.textContent = displayValue(pressure.current?.detail);
+      elements.pressureAnalysis.textContent = displayValue(pressure.analysis?.headline);
+      elements.pressureAnalysisDetail.textContent = displayValue(pressure.analysis?.detail);
+      elements.pressureTrend.textContent = displayValue(pressure.trend?.headline);
+      elements.pressureTrendDetail.textContent = displayValue(pressure.trend?.detail);
+
+      elements.meanTemperature.textContent = displayValue(temperature.mean?.headline);
+      elements.meanTemperatureDetail.textContent = displayValue(temperature.mean?.detail);
+      elements.currentTemperature.textContent = displayValue(temperature.current?.headline);
+      elements.currentTemperatureDetail.textContent = displayValue(temperature.current?.detail);
+      elements.temperatureAnalysis.textContent = displayValue(temperature.analysis?.headline);
+      elements.temperatureAnalysisDetail.textContent = displayValue(temperature.analysis?.detail);
+      elements.temperatureTrend.textContent = displayValue(temperature.trend?.headline);
+      elements.temperatureTrendDetail.textContent = displayValue(temperature.trend?.detail);
+    }
+
+    function extractWindSamples(records) {
+      return records
+        .map(extractWindSample)
+        .filter((sample) => sample !== null)
+        .sort((left, right) => left.time - right.time);
+    }
+
+    function extractWindSample(record) {
+      if (!record || typeof record !== "object") {
+        return null;
+      }
+
+      const time = new Date(record.utc_time);
+      if (Number.isNaN(time.getTime())) {
+        return null;
+      }
+
+      const direction = measurementValue(record.wind_direction);
+      if (!Number.isFinite(direction)) {
+        return null;
+      }
+
+      return {
+        time,
+        direction: normalizeDegrees(direction),
+        rollingDirection: measurementValue(record.rolling_wind_direction),
+      };
+    }
+
+    function renderPlotSvg(samples, context) {
+      const width = 980;
+      const height = 760;
+      const centerX = 420;
+      const centerY = 700;
+      const innerRadius = 58;
+      const outerRadius = 560;
+      const meanDirection = context.meanDirection;
+      const latestTime = samples[samples.length - 1].time.getTime();
+      const earliestTime = samples[0].time.getTime();
+      const duration = Math.max(latestTime - earliestTime, 1);
+      const offsets = samples.map((sample) => signedAngleDifference(sample.direction, meanDirection));
+      const maxOffset = Math.max(...offsets.map((value) => Math.abs(value)));
+      const sectorSpan = clamp(maxOffset * 2 + 16, 28, 110);
+      const startAngle = normalizeDegrees(meanDirection - sectorSpan / 2);
+      const endAngle = normalizeDegrees(meanDirection + sectorSpan / 2);
+      const angleStep = chooseAngleStep(sectorSpan);
+      const boundaryAngles = buildAngleTicks(meanDirection, sectorSpan, angleStep);
+      const radialTicks = buildRadialTicks(samples[0].time, samples[samples.length - 1].time, 6);
+
+      const samplePoints = samples.map((sample) => {
+        const radius = innerRadius + ((sample.time.getTime() - earliestTime) / duration) * (outerRadius - innerRadius);
+        return polarPoint(centerX, centerY, unwrapDegrees(sample.direction, meanDirection), radius);
+      });
+
+      const averagePoints = samples.map((sample, index) => {
+        const radius = innerRadius + ((sample.time.getTime() - earliestTime) / duration) * (outerRadius - innerRadius);
+        const rollingDirection = Number.isFinite(sample.rollingDirection) ? sample.rollingDirection : meanDirection;
+        return polarPoint(centerX, centerY, unwrapDegrees(rollingDirection, meanDirection), radius);
+      });
+
+      const gridArcs = radialTicks.map((tick) => {
+        const ratio = tick.ratio;
+        const radius = innerRadius + ratio * (outerRadius - innerRadius);
+        return `<path d="${arcPath(centerX, centerY, radius, startAngle, endAngle)}" fill="none" stroke="#d9dee5" stroke-width="${tick.isMajor ? 1.5 : 1}" />`;
+      }).join("");
+
+      const angleGrid = boundaryAngles.map((angle) => {
+        const inner = polarPoint(centerX, centerY, angle, innerRadius - 6);
+        const outer = polarPoint(centerX, centerY, angle, outerRadius);
+        const labelPoint = polarPoint(centerX, centerY, angle, outerRadius + 38);
+        return `
+          <line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="#c3cad2" stroke-width="1.1" />
+          <text x="${labelPoint.x}" y="${labelPoint.y}" fill="#17212b" font-size="14" font-weight="600" text-anchor="middle">${escapeHtml(formatDegreesLabel(angle))}</text>
+        `;
+      }).join("");
+
+      const radialLabels = radialTicks.map((tick) => {
+        const radius = innerRadius + tick.ratio * (outerRadius - innerRadius);
+        const anchor = polarPoint(centerX, centerY, endAngle, radius);
+        return `
+          <text x="${anchor.x + 16}" y="${anchor.y + 4}" fill="#17212b" font-size="14" font-weight="${tick.isMajor ? "600" : "400"}">${escapeHtml(formatTimeLabel(tick.time))}</text>
+        `;
+      }).join("");
+
+      const sectorShell = `
+        <path d="${wedgePath(centerX, centerY, innerRadius, outerRadius, startAngle, endAngle)}" fill="rgb(255 255 255 / 0.96)" stroke="#2b2f36" stroke-width="2" />
+      `;
+
+      const meanOuter = polarPoint(centerX, centerY, meanDirection, outerRadius);
+      const meanInner = polarPoint(centerX, centerY, meanDirection, innerRadius - 10);
+      const latestAverage = averagePoints[averagePoints.length - 1];
+      const latestSample = samplePoints[samplePoints.length - 1];
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Polar wind visualization">
+          ${sectorShell}
+          ${gridArcs}
+          ${angleGrid}
+          ${radialLabels}
+          <path d="${polylinePath(samplePoints)}" fill="none" stroke="rgb(177 183 192 / 70%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${polylinePath(averagePoints)}" fill="none" stroke="#54e36f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+          <line x1="${meanInner.x}" y1="${meanInner.y}" x2="${meanOuter.x}" y2="${meanOuter.y}" stroke="#de4b52" stroke-width="4" stroke-linecap="round" />
+          <circle cx="${latestAverage.x}" cy="${latestAverage.y}" r="6" fill="#de4b52" />
+          <circle cx="${latestSample.x}" cy="${latestSample.y}" r="4" fill="#7f8790" />
+        </svg>
+      `;
+    }
+
+    function buildAngleTicks(meanDirection, sectorSpan, step) {
+      const ticks = [];
+      const halfSpan = sectorSpan / 2;
+      const start = Math.ceil(-halfSpan / step) * step;
+      const end = Math.floor(halfSpan / step) * step;
+
+      for (let offset = start; offset <= end; offset += step) {
+        ticks.push(normalizeDegrees(meanDirection + offset));
+      }
+
+      const startAngle = normalizeDegrees(meanDirection - halfSpan);
+      const endAngle = normalizeDegrees(meanDirection + halfSpan);
+      if (!ticks.includes(startAngle)) {
+        ticks.unshift(startAngle);
+      }
+      if (!ticks.includes(endAngle)) {
+        ticks.push(endAngle);
+      }
+      return ticks;
+    }
+
+    function buildRadialTicks(startTime, endTime, count) {
+      const items = [];
+      const span = Math.max(endTime.getTime() - startTime.getTime(), 1);
+
+      for (let index = 0; index <= count; index += 1) {
+        const ratio = index / count;
+        const time = new Date(startTime.getTime() + ratio * span);
+        items.push({
+          ratio,
+          time,
+          isMajor: index === 0 || index === count || index % 2 === 0,
+        });
+      }
+
+      return items;
+    }
+
+    function wedgePath(cx, cy, innerRadius, outerRadius, startAngle, endAngle) {
+      const outerStart = polarPoint(cx, cy, startAngle, outerRadius);
+      const outerEnd = polarPoint(cx, cy, endAngle, outerRadius);
+      const innerEnd = polarPoint(cx, cy, endAngle, innerRadius);
+      const innerStart = polarPoint(cx, cy, startAngle, innerRadius);
+      const largeArcFlag = normalizedArcSweep(startAngle, endAngle) > 180 ? 1 : 0;
+
+      return [
+        `M ${innerStart.x} ${innerStart.y}`,
+        `L ${outerStart.x} ${outerStart.y}`,
+        `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${outerEnd.x} ${outerEnd.y}`,
+        `L ${innerEnd.x} ${innerEnd.y}`,
+        `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
+        "Z",
+      ].join(" ");
+    }
+
+    function arcPath(cx, cy, radius, startAngle, endAngle) {
+      const start = polarPoint(cx, cy, startAngle, radius);
+      const end = polarPoint(cx, cy, endAngle, radius);
+      const largeArcFlag = normalizedArcSweep(startAngle, endAngle) > 180 ? 1 : 0;
+      return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+    }
+
+    function polylinePath(points) {
+      if (!points.length) {
+        return "";
+      }
+      return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+    }
+
+    function polarPoint(cx, cy, angleDegrees, radius) {
+      const radians = degreesToRadians(angleDegrees);
+      return {
+        x: roundToThree(cx + Math.sin(radians) * radius),
+        y: roundToThree(cy - Math.cos(radians) * radius),
+      };
+    }
+
+    function normalizedArcSweep(startAngle, endAngle) {
+      return (endAngle - startAngle + 360) % 360;
+    }
+
+    function unwrapDegrees(angle, reference) {
+      return reference + signedAngleDifference(angle, reference);
+    }
+
+    function signedAngleDifference(angle, reference) {
+      return ((angle - reference + 540) % 360) - 180;
+    }
+
+    function chooseAngleStep(spanDegrees) {
+      if (spanDegrees <= 36) {
+        return 5;
+      }
+      if (spanDegrees <= 72) {
+        return 10;
+      }
+      return 15;
+    }
+
+    function countCrossings(values) {
+      let crossings = 0;
+      let previousSign = 0;
+
+      for (const value of values) {
+        const sign = Math.abs(value) < 1 ? 0 : Math.sign(value);
+        if (sign === 0) {
+          continue;
+        }
+        if (previousSign !== 0 && sign !== previousSign) {
+          crossings += 1;
+        }
+        previousSign = sign;
+      }
+
+      return crossings;
+    }
+
+    function describeWindow(history, samples, span) {
+      const startValue = history.oldest_utc_time || samples[0].time;
+      const endValue = history.latest_utc_time || samples[samples.length - 1].time;
+      const prefix = span ? `${formatSpanLabel(span)} window` : `${samples.length} samples`;
+      return `${prefix} | ${formatLocalClockTime(startValue)} to ${formatLocalClockTime(endValue)} local (${formatLocalIsoDate(endValue)})`;
+    }
+
+    function formatDegreesLabel(value) {
+      return `${normalizeDegrees(value).toFixed(0)}\u00b0`;
+    }
+
+    function formatTimeLabel(value) {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(value);
+    }
+
+    function formatLocalDateTime(value) {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "-";
+      }
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(date);
+    }
+
+    function formatLocalTime(value) {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "-";
+      }
+      return new Intl.DateTimeFormat(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    }
+
+    function formatLocalClockTime(value) {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "-";
+      }
+
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+      return formatter.format(date).replace(" AM", " a.m.").replace(" PM", " p.m.");
+    }
+
+    function formatLocalIsoDate(value) {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "-";
+      }
+
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatSpanLabel(span) {
+      return String(span)
+        .replaceAll("-", " ")
+        .replace(/\bminutes\b/i, "minute")
+        .replace(/\bhours\b/i, "hour")
+        .replace(/\bdays\b/i, "day");
+    }
+
+    function normalizeDegrees(value) {
+      return ((value % 360) + 360) % 360;
+    }
+
+    function measurementValue(measurement) {
+      if (!measurement || typeof measurement !== "object") {
+        return null;
+      }
+      const value = Number(measurement.value);
+      return Number.isFinite(value) ? value : null;
+    }
+
+    function historyUrl(config) {
+      const params = new URLSearchParams();
+      params.set("span", config.span);
+      return `/nmea/history/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}?${params.toString()}`;
+    }
+
+    function readRequestConfig() {
+      const org = firstQueryValue("org");
+      const source = firstQueryValue("src", "source");
+      const span = firstQueryValue("span") || DEFAULT_SPAN;
+
+      return {
+        org,
+        source,
+        span,
+        refreshIntervalMs: readRefreshIntervalMs(),
+      };
+    }
+
+    function firstQueryValue(...keys) {
+      for (const key of keys) {
+        const value = PAGE_QUERY.get(key);
+        if (value && value.trim()) {
+          return value.trim();
+        }
+      }
+      return "";
+    }
+
+    function readRefreshIntervalMs() {
+      const value = Number(PAGE_QUERY.get("rate"));
+      if (!Number.isFinite(value) || value <= 0) {
+        return REFRESH_INTERVAL_MS;
+      }
+      return value * 1000;
+    }
+
+    function degreesToRadians(value) {
+      return value * Math.PI / 180;
+    }
+
+    function radiansToDegrees(value) {
+      return value * 180 / Math.PI;
+    }
+
+    function roundToThree(value) {
+      return Math.round(value * 1000) / 1000;
+    }
+
+    function clamp(value, minimum, maximum) {
+      return Math.min(Math.max(value, minimum), maximum);
+    }
+
+    function displayValue(value) {
+      return value === null || value === undefined || value === "" ? "-" : String(value);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setStatus(message, isError = false) {
+      elements.status.textContent = message;
+      elements.status.classList.toggle("error", isError);
+    }
+  </script>
+</body>
+</html>
