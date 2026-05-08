@@ -65,7 +65,7 @@
       font-weight: 700;
       line-height: 1.2;
       color: #17212b;
-      text-align: center;
+      text-align: left;
     }
 
     .weather-table {
@@ -76,7 +76,7 @@
 
     .weather-table th,
     .weather-table td {
-      padding: 12px 14px;
+      padding: 12px 12px;
       border-bottom: 1px solid #d9dee5;
       text-align: left;
       vertical-align: top;
@@ -89,7 +89,7 @@
     }
 
     .weather-table th {
-      width: 58px;
+      width: 48px;
       color: #4c5a67;
       font-weight: 700;
       text-align: center;
@@ -97,11 +97,12 @@
 
     .weather-table .value-cell {
       font-weight: 600;
+      overflow-wrap: anywhere;
     }
 
     .cell-icon {
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       flex: 0 0 auto;
       color: #28758a;
       opacity: 0.86;
@@ -155,6 +156,26 @@
     .gm-style .gm-style-iw-chr {
       display: none;
     }
+
+    @media (max-width: 420px) {
+      .popup-card {
+        width: min(320px, calc(100vw - 36px));
+      }
+
+      .weather-table th,
+      .weather-table td {
+        padding: 10px 8px;
+      }
+
+      .weather-table th {
+        width: 38px;
+      }
+
+      .cell-icon {
+        width: 24px;
+        height: 24px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -162,7 +183,6 @@
   <div id="map"></div>
 
   <script>
-    const DEFAULT_LOCATION = { lat: 0, lng: 0 };
     const REFRESH_INTERVAL_MS = 10000;
     const DEFAULT_VIEW_HEIGHT_METRES = 1000;
     const PAGE_QUERY = new URLSearchParams(window.location.search);
@@ -183,62 +203,71 @@
     }
 
     window.initMap = async function initMap() {
-      ({ AdvancedMarkerElement } = await google.maps.importLibrary("marker"));
+      try {
+        ({ AdvancedMarkerElement } = await google.maps.importLibrary("marker"));
+        const weather = await fetchWeather();
+        const position = weatherPosition(weather);
 
-      map = new google.maps.Map(document.getElementById("map"), {
-        center: DEFAULT_LOCATION,
-        zoom: 3,
-        mapTypeId: "hybrid",
-        mapId: "DEMO_MAP_ID",
-      });
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: position,
+          zoom: 18,
+          mapTypeId: "hybrid",
+          mapId: "DEMO_MAP_ID",
+        });
 
-      infoWindow = new google.maps.InfoWindow();
+        infoWindow = new google.maps.InfoWindow();
 
-      await refreshWeather(true);
-      setInterval(() => {
-        refreshWeather(false);
-      }, requestConfig.refreshIntervalMs);
+        renderWeatherOnMap(weather, position, true);
+        setInterval(() => {
+          refreshWeather(false);
+        }, requestConfig.refreshIntervalMs);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
     };
 
     async function refreshWeather(isInitialLoad) {
       try {
         const weather = await fetchWeather();
         const position = weatherPosition(weather);
-
-        if (!marker) {
-          marker = new AdvancedMarkerElement({
-            position,
-            map,
-            title: formatTitle(weather),
-            content: buildBoatMarker(directionDegrees(weather.wind_direction)),
-            anchorLeft: "-50%",
-            anchorTop: "-50%",
-          });
-          marker.addEventListener("gmp-click", () => infoWindow.open({ anchor: marker, map }));
-        } else {
-          marker.position = position;
-          marker.title = formatTitle(weather);
-          marker.content = buildBoatMarker(directionDegrees(weather.wind_direction));
-        }
-
-        updateWindwardMarker(weather.windward, {
-          rotationDegrees: reverseDirectionDegrees(weather.wind_direction),
-          title: "Windward",
-        });
-
-        if (isInitialLoad) {
-          applyDefaultView(position);
-        } else {
-          map.panTo(position);
-        }
-
-        document.title = popupTitle(weather);
-        infoWindow.setContent(renderWeatherCard(weather));
-        infoWindow.open({ anchor: marker, map });
-        setStatus(`Updated ${formatLocalDateTime(new Date())}`);
+        renderWeatherOnMap(weather, position, isInitialLoad);
       } catch (error) {
         setStatus(error.message, true);
       }
+    }
+
+    function renderWeatherOnMap(weather, position, isInitialLoad) {
+      if (!marker) {
+        marker = new AdvancedMarkerElement({
+          position,
+          map,
+          title: formatTitle(weather),
+          content: buildBoatMarker(directionDegrees(weather.wind_direction)),
+          anchorLeft: "-50%",
+          anchorTop: "-50%",
+        });
+        marker.addEventListener("gmp-click", () => infoWindow.open({ anchor: marker, map }));
+      } else {
+        marker.position = position;
+        marker.title = formatTitle(weather);
+        marker.content = buildBoatMarker(directionDegrees(weather.wind_direction));
+      }
+
+      updateWindwardMarker(weather.windward, {
+        rotationDegrees: reverseDirectionDegrees(weather.wind_direction),
+        title: "Windward",
+      });
+
+      if (isInitialLoad) {
+        applyDefaultView(position);
+      } else {
+        map.panTo(position);
+      }
+
+      document.title = popupTitle(weather);
+      infoWindow.setContent(renderWeatherCard(weather));
+      infoWindow.open({ anchor: marker, map });
+      setStatus(`Updated ${formatLocalDateTime(new Date())}`);
     }
 
     async function fetchWeather() {

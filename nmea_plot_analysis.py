@@ -203,7 +203,7 @@ def pressure_analysis(samples: list[dict[str, object]]) -> dict[str, object]:
         return {"headline": "-", "detail": "-"}
 
     total_swing = max(values) - min(values)
-    headline = "Steady"
+    headline = "Stable"
     if total_swing >= 2.5:
         headline = "Active"
     if total_swing >= 5.0:

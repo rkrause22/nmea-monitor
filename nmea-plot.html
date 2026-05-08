@@ -6,10 +6,10 @@
   <title>Polar Wind Plot</title>
   <style>
     :root {
-      color-scheme: light;
+      color-scheme: dark;
       font-family: Arial, Helvetica, sans-serif;
-      color: #17212b;
-      background: #f4f7f9;
+      color: #edf3f9;
+      background: #090d11;
     }
 
     * {
@@ -18,88 +18,96 @@
 
     body {
       margin: 0;
-      padding: 28px 24px 36px;
-      background: #f4f7f9;
-      color: #17212b;
+      padding: 24px 24px 32px;
+      background: #090d11;
+      color: #edf3f9;
       font-family: inherit;
     }
 
     main {
-      max-width: 1180px;
+      max-width: 1120px;
       margin: 0 auto;
     }
 
     h1 {
       margin: 0 0 8px;
       text-align: center;
-      font-size: 28px;
+      font-size: 32px;
       font-weight: 700;
       line-height: 1.2;
     }
 
     .subheading {
-      margin: 0 0 22px;
+      margin: 0 0 18px;
       text-align: center;
-      color: #4c5a67;
-      font-size: 15px;
+      color: #99a7b5;
+      font-size: 17px;
       line-height: 1.4;
+      white-space: nowrap;
     }
 
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
+      gap: 14px;
+      margin-bottom: 14px;
     }
 
     .secondary-grid {
-      margin-top: 12px;
+      margin-top: 20px;
     }
 
     .metric-card {
-      min-height: 92px;
+      min-height: 104px;
       padding: 14px 16px;
-      background: #ffffff;
-      border: 1px solid #d9dee5;
+      background: #121920;
+      border: 1px solid #24313e;
       border-radius: 6px;
-      box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+      box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
     }
 
     .metric-label {
-      margin: 0 0 8px;
-      color: #4c5a67;
-      font-size: 13px;
+      margin: 0 0 6px;
+      color: #9ba9b8;
+      font-size: 14px;
       font-weight: 700;
       letter-spacing: 0;
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
     .metric-value {
       margin: 0;
-      font-size: 24px;
+      color: #f5f9fc;
+      font-size: 29px;
       font-weight: 700;
       line-height: 1.15;
+      white-space: nowrap;
     }
 
     .metric-detail {
-      margin: 8px 0 0;
-      color: #6a7886;
-      font-size: 13px;
+      margin: 6px 0 0;
+      color: #8d9aa8;
+      font-size: 14px;
       line-height: 1.35;
+      white-space: nowrap;
     }
 
     .plot-panel {
-      background: #ffffff;
-      border: 1px solid #d9dee5;
+      background: #121920;
+      border: 1px solid #24313e;
       border-radius: 6px;
-      box-shadow: 0 2px 10px rgb(0 0 0 / 8%);
+      box-shadow: 0 10px 28px rgb(0 0 0 / 30%);
       overflow: hidden;
     }
 
     .plot-frame {
       width: 100%;
-      min-height: 720px;
-      padding: 10px 10px 0;
+      min-height: 900px;
+      padding: 12px 12px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .plot-frame svg {
@@ -112,11 +120,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 12px 16px 14px;
-      border-top: 1px solid #d9dee5;
-      color: #4c5a67;
-      font-size: 14px;
+      gap: 10px;
+      padding: 10px 14px 12px;
+      border-top: 1px solid #24313e;
+      color: #9ba9b8;
+      font-size: 15px;
     }
 
     .legend {
@@ -141,7 +149,7 @@
     }
 
     .legend-line.raw {
-      border-top-color: rgb(177 183 192 / 70%);
+      border-top-color: rgb(138 149 162 / 58%);
     }
 
     .legend-line.avg {
@@ -154,17 +162,18 @@
 
     .status {
       min-height: 20px;
-      color: #d9dee5;
-      font-size: 14px;
+      color: #8fa0b2;
+      font-size: 16px;
       text-align: right;
+      white-space: nowrap;
     }
 
     .status.error {
-      color: #a12622;
+      color: #ff7f7f;
     }
 
     .muted {
-      color: #6a7886;
+      color: #8d9aa8;
     }
 
     @media (max-width: 920px) {
@@ -173,7 +182,7 @@
       }
 
       .plot-frame {
-        min-height: 580px;
+        min-height: 700px;
       }
 
       .plot-footer {
@@ -188,11 +197,11 @@
 
     @media (max-width: 640px) {
       body {
-        padding: 18px 16px 28px;
+        padding: 14px 12px 24px;
       }
 
       h1 {
-        font-size: 24px;
+        font-size: 26px;
       }
 
       .summary-grid {
@@ -200,8 +209,8 @@
       }
 
       .plot-frame {
-        min-height: 460px;
-        padding: 8px 6px 0;
+        min-height: 0;
+        padding: 6px 4px 0;
       }
     }
   </style>
@@ -296,6 +305,9 @@
   <script>
     const DEFAULT_SPAN = "30-minutes";
     const REFRESH_INTERVAL_MS = 60000;
+    const DISPLAY_CENTER_ANGLE = 0;
+    const RANGE_STEP_DEGREES = 5;
+    const RANGE_PADDING_DEGREES = 5;
     const PAGE_QUERY = new URLSearchParams(window.location.search);
 
     const elements = {
@@ -445,49 +457,65 @@
     }
 
     function renderPlotSvg(samples, context) {
-      const width = 980;
-      const height = 760;
-      const centerX = 420;
-      const centerY = 700;
-      const innerRadius = 58;
-      const outerRadius = 560;
       const meanDirection = context.meanDirection;
       const latestTime = samples[samples.length - 1].time.getTime();
       const earliestTime = samples[0].time.getTime();
       const duration = Math.max(latestTime - earliestTime, 1);
       const offsets = samples.map((sample) => signedAngleDifference(sample.direction, meanDirection));
-      const maxOffset = Math.max(...offsets.map((value) => Math.abs(value)));
-      const sectorSpan = clamp(maxOffset * 2 + 16, 28, 110);
-      const startAngle = normalizeDegrees(meanDirection - sectorSpan / 2);
-      const endAngle = normalizeDegrees(meanDirection + sectorSpan / 2);
+      const range = buildDisplayRange(offsets);
+      const startOffset = -range.negative;
+      const endOffset = range.positive;
+      const sectorSpan = endOffset - startOffset;
+      const startAngle = DISPLAY_CENTER_ANGLE + startOffset;
+      const endAngle = DISPLAY_CENTER_ANGLE + endOffset;
       const angleStep = chooseAngleStep(sectorSpan);
-      const boundaryAngles = buildAngleTicks(meanDirection, sectorSpan, angleStep);
+      const boundaryOffsets = buildOffsetTicks(startOffset, endOffset, angleStep);
       const radialTicks = buildRadialTicks(samples[0].time, samples[samples.length - 1].time, 6);
+      const width = 1040;
+      const height = 980;
+      const viewBoxTop = 190;
+      const viewBoxHeight = 760;
+      const centerX = 520;
+      const centerY = 920;
+      const innerRadius = 70;
+      const outerRadius = 640;
 
       const samplePoints = samples.map((sample) => {
         const radius = innerRadius + ((sample.time.getTime() - earliestTime) / duration) * (outerRadius - innerRadius);
-        return polarPoint(centerX, centerY, unwrapDegrees(sample.direction, meanDirection), radius);
+        return polarPoint(
+          centerX,
+          centerY,
+          DISPLAY_CENTER_ANGLE + signedAngleDifference(sample.direction, meanDirection),
+          radius,
+        );
       });
 
       const averagePoints = samples.map((sample, index) => {
         const radius = innerRadius + ((sample.time.getTime() - earliestTime) / duration) * (outerRadius - innerRadius);
         const rollingDirection = Number.isFinite(sample.rollingDirection) ? sample.rollingDirection : meanDirection;
-        return polarPoint(centerX, centerY, unwrapDegrees(rollingDirection, meanDirection), radius);
+        return polarPoint(
+          centerX,
+          centerY,
+          DISPLAY_CENTER_ANGLE + signedAngleDifference(rollingDirection, meanDirection),
+          radius,
+        );
       });
 
       const gridArcs = radialTicks.map((tick) => {
         const ratio = tick.ratio;
         const radius = innerRadius + ratio * (outerRadius - innerRadius);
-        return `<path d="${arcPath(centerX, centerY, radius, startAngle, endAngle)}" fill="none" stroke="#d9dee5" stroke-width="${tick.isMajor ? 1.5 : 1}" />`;
+        return `<path d="${arcPath(centerX, centerY, radius, startAngle, endAngle)}" fill="none" stroke="${tick.isMajor ? "#3c4a58" : "#2b3744"}" stroke-width="${tick.isMajor ? 1.5 : 1}" />`;
       }).join("");
 
-      const angleGrid = boundaryAngles.map((angle) => {
-        const inner = polarPoint(centerX, centerY, angle, innerRadius - 6);
-        const outer = polarPoint(centerX, centerY, angle, outerRadius);
-        const labelPoint = polarPoint(centerX, centerY, angle, outerRadius + 38);
+      const angleGrid = boundaryOffsets.map((offset) => {
+        const displayAngle = DISPLAY_CENTER_ANGLE + offset;
+        const actualAngle = normalizeDegrees(meanDirection + offset);
+        const inner = polarPoint(centerX, centerY, displayAngle, innerRadius - 6);
+        const outer = polarPoint(centerX, centerY, displayAngle, outerRadius);
+        const labelPoint = polarPoint(centerX, centerY, displayAngle, outerRadius + 34);
         return `
-          <line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="#c3cad2" stroke-width="1.1" />
-          <text x="${labelPoint.x}" y="${labelPoint.y}" fill="#17212b" font-size="14" font-weight="600" text-anchor="middle">${escapeHtml(formatDegreesLabel(angle))}</text>
+          <line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="#41505e" stroke-width="1.1" />
+          <text x="${labelPoint.x}" y="${labelPoint.y}" fill="#edf3f9" font-size="15" font-weight="600" text-anchor="middle">${escapeHtml(formatDegreesLabel(actualAngle))}</text>
         `;
       }).join("");
 
@@ -495,53 +523,58 @@
         const radius = innerRadius + tick.ratio * (outerRadius - innerRadius);
         const anchor = polarPoint(centerX, centerY, endAngle, radius);
         return `
-          <text x="${anchor.x + 16}" y="${anchor.y + 4}" fill="#17212b" font-size="14" font-weight="${tick.isMajor ? "600" : "400"}">${escapeHtml(formatTimeLabel(tick.time))}</text>
+          <text x="${anchor.x + 16}" y="${anchor.y + 4}" fill="#edf3f9" font-size="15" font-weight="${tick.isMajor ? "600" : "400"}">${escapeHtml(formatTimeLabel(tick.time))}</text>
         `;
       }).join("");
 
       const sectorShell = `
-        <path d="${wedgePath(centerX, centerY, innerRadius, outerRadius, startAngle, endAngle)}" fill="rgb(255 255 255 / 0.96)" stroke="#2b2f36" stroke-width="2" />
+        <path d="${wedgePath(centerX, centerY, innerRadius, outerRadius, startAngle, endAngle)}" fill="#0f161d" stroke="#6c7a88" stroke-width="2" />
       `;
 
-      const meanOuter = polarPoint(centerX, centerY, meanDirection, outerRadius);
-      const meanInner = polarPoint(centerX, centerY, meanDirection, innerRadius - 10);
+      const meanOuter = polarPoint(centerX, centerY, DISPLAY_CENTER_ANGLE, outerRadius);
+      const meanInner = polarPoint(centerX, centerY, DISPLAY_CENTER_ANGLE, innerRadius - 10);
       const latestAverage = averagePoints[averagePoints.length - 1];
       const latestSample = samplePoints[samplePoints.length - 1];
 
       return `
-        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Polar wind visualization">
+        <svg viewBox="0 ${viewBoxTop} ${width} ${viewBoxHeight}" role="img" aria-label="Polar wind visualization">
           ${sectorShell}
           ${gridArcs}
           ${angleGrid}
           ${radialLabels}
-          <path d="${polylinePath(samplePoints)}" fill="none" stroke="rgb(177 183 192 / 70%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="${polylinePath(averagePoints)}" fill="none" stroke="#54e36f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${polylinePath(samplePoints)}" fill="none" stroke="rgb(150 161 173 / 50%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${polylinePath(averagePoints)}" fill="none" stroke="#66f285" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
           <line x1="${meanInner.x}" y1="${meanInner.y}" x2="${meanOuter.x}" y2="${meanOuter.y}" stroke="#de4b52" stroke-width="4" stroke-linecap="round" />
           <circle cx="${latestAverage.x}" cy="${latestAverage.y}" r="6" fill="#de4b52" />
-          <circle cx="${latestSample.x}" cy="${latestSample.y}" r="4" fill="#7f8790" />
+          <circle cx="${latestSample.x}" cy="${latestSample.y}" r="4" fill="#c7d0d8" />
         </svg>
       `;
     }
 
-    function buildAngleTicks(meanDirection, sectorSpan, step) {
+    function buildOffsetTicks(startOffset, endOffset, step) {
       const ticks = [];
-      const halfSpan = sectorSpan / 2;
-      const start = Math.ceil(-halfSpan / step) * step;
-      const end = Math.floor(halfSpan / step) * step;
+      const start = Math.ceil(startOffset / step) * step;
+      const end = Math.floor(endOffset / step) * step;
 
       for (let offset = start; offset <= end; offset += step) {
-        ticks.push(normalizeDegrees(meanDirection + offset));
+        ticks.push(offset);
       }
 
-      const startAngle = normalizeDegrees(meanDirection - halfSpan);
-      const endAngle = normalizeDegrees(meanDirection + halfSpan);
-      if (!ticks.includes(startAngle)) {
-        ticks.unshift(startAngle);
+      if (!ticks.includes(startOffset)) {
+        ticks.unshift(startOffset);
       }
-      if (!ticks.includes(endAngle)) {
-        ticks.push(endAngle);
+      if (!ticks.includes(endOffset)) {
+        ticks.push(endOffset);
       }
       return ticks;
+    }
+
+    function buildDisplayRange(offsets) {
+      const negativeExtent = Math.max(...offsets.filter((value) => value < 0).map((value) => Math.abs(value)), 0);
+      const positiveExtent = Math.max(...offsets.filter((value) => value > 0).map((value) => value), 0);
+      const negative = clamp(roundRangeOutward(negativeExtent + RANGE_PADDING_DEGREES), 15, 55);
+      const positive = clamp(roundRangeOutward(positiveExtent + RANGE_PADDING_DEGREES), 15, 55);
+      return { negative, positive };
     }
 
     function buildRadialTicks(startTime, endTime, count) {
@@ -604,10 +637,6 @@
       return (endAngle - startAngle + 360) % 360;
     }
 
-    function unwrapDegrees(angle, reference) {
-      return reference + signedAngleDifference(angle, reference);
-    }
-
     function signedAngleDifference(angle, reference) {
       return ((angle - reference + 540) % 360) - 180;
     }
@@ -620,24 +649,6 @@
         return 10;
       }
       return 15;
-    }
-
-    function countCrossings(values) {
-      let crossings = 0;
-      let previousSign = 0;
-
-      for (const value of values) {
-        const sign = Math.abs(value) < 1 ? 0 : Math.sign(value);
-        if (sign === 0) {
-          continue;
-        }
-        if (previousSign !== 0 && sign !== previousSign) {
-          crossings += 1;
-        }
-        previousSign = sign;
-      }
-
-      return crossings;
     }
 
     function describeWindow(history, samples, span) {
@@ -666,17 +677,6 @@
       return new Intl.DateTimeFormat(undefined, {
         dateStyle: "short",
         timeStyle: "short",
-      }).format(date);
-    }
-
-    function formatLocalTime(value) {
-      const date = value instanceof Date ? value : new Date(value);
-      if (Number.isNaN(date.getTime())) {
-        return "-";
-      }
-      return new Intl.DateTimeFormat(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
       }).format(date);
     }
 
@@ -768,12 +768,12 @@
       return value * Math.PI / 180;
     }
 
-    function radiansToDegrees(value) {
-      return value * 180 / Math.PI;
-    }
-
     function roundToThree(value) {
       return Math.round(value * 1000) / 1000;
+    }
+
+    function roundRangeOutward(value) {
+      return Math.ceil(value / RANGE_STEP_DEGREES) * RANGE_STEP_DEGREES;
     }
 
     function clamp(value, minimum, maximum) {
