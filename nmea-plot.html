@@ -6,10 +6,24 @@
   <title>Polar Wind Plot</title>
   <style>
     :root {
-      color-scheme: dark;
+      color-scheme: light;
       font-family: Arial, Helvetica, sans-serif;
-      color: #edf3f9;
-      background: #090d11;
+      color: #101820;
+      background: #f3f6f8;
+      --page-bg: #f3f6f8;
+      --panel-bg: #ffffff;
+      --panel-border: #b8c5ce;
+      --text: #101820;
+      --muted: #4d5f6d;
+      --soft-text: #60717e;
+      --plot-bg: #eef4f7;
+      --plot-grid: #7f909d;
+      --plot-grid-soft: #c7d2da;
+      --plot-shell: #ffffff;
+      --plot-shell-stroke: #4f6574;
+      --sample-line: rgb(71 91 106 / 62%);
+      --average-line: #147a37;
+      --mean-line: #d22f27;
     }
 
     * {
@@ -19,8 +33,8 @@
     body {
       margin: 0;
       padding: 24px 24px 32px;
-      background: #090d11;
-      color: #edf3f9;
+      background: var(--page-bg);
+      color: var(--text);
       font-family: inherit;
     }
 
@@ -40,7 +54,7 @@
     .subheading {
       margin: 0 0 18px;
       text-align: center;
-      color: #99a7b5;
+      color: var(--muted);
       font-size: 17px;
       line-height: 1.4;
       white-space: nowrap;
@@ -57,18 +71,22 @@
       margin-top: 20px;
     }
 
+    .metrics-column {
+      display: contents;
+    }
+
     .metric-card {
       min-height: 104px;
       padding: 14px 16px;
-      background: #121920;
-      border: 1px solid #24313e;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
       border-radius: 6px;
-      box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+      box-shadow: 0 5px 16px rgb(18 42 58 / 12%);
     }
 
     .metric-label {
       margin: 0 0 6px;
-      color: #9ba9b8;
+      color: var(--soft-text);
       font-size: 14px;
       font-weight: 700;
       letter-spacing: 0;
@@ -78,7 +96,7 @@
 
     .metric-value {
       margin: 0;
-      color: #f5f9fc;
+      color: var(--text);
       font-size: 29px;
       font-weight: 700;
       line-height: 1.15;
@@ -87,17 +105,17 @@
 
     .metric-detail {
       margin: 6px 0 0;
-      color: #8d9aa8;
+      color: var(--muted);
       font-size: 14px;
       line-height: 1.35;
       white-space: nowrap;
     }
 
     .plot-panel {
-      background: #121920;
-      border: 1px solid #24313e;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
       border-radius: 6px;
-      box-shadow: 0 10px 28px rgb(0 0 0 / 30%);
+      box-shadow: 0 6px 20px rgb(18 42 58 / 14%);
       overflow: hidden;
     }
 
@@ -122,8 +140,8 @@
       justify-content: space-between;
       gap: 10px;
       padding: 10px 14px 12px;
-      border-top: 1px solid #24313e;
-      color: #9ba9b8;
+      border-top: 1px solid var(--panel-border);
+      color: var(--muted);
       font-size: 15px;
     }
 
@@ -149,31 +167,193 @@
     }
 
     .legend-line.raw {
-      border-top-color: rgb(138 149 162 / 58%);
+      border-top-color: var(--sample-line);
     }
 
     .legend-line.avg {
-      border-top-color: #54e36f;
+      border-top-color: var(--average-line);
     }
 
     .legend-line.mean {
-      border-top-color: #de4b52;
+      border-top-color: var(--mean-line);
     }
 
     .status {
       min-height: 20px;
-      color: #8fa0b2;
+      color: var(--muted);
       font-size: 16px;
       text-align: right;
       white-space: nowrap;
     }
 
     .status.error {
-      color: #ff7f7f;
+      color: #b42318;
     }
 
     .muted {
-      color: #8d9aa8;
+      color: var(--muted);
+    }
+
+    @media (min-width: 1200px) {
+      body {
+        padding: 12px 18px 18px;
+      }
+
+      main {
+        max-width: 1884px;
+        display: grid;
+        grid-template-columns: minmax(940px, 1fr) minmax(760px, 860px);
+        grid-template-areas:
+          "title title"
+          "subtitle subtitle"
+          "wind plot"
+          "metrics plot";
+        gap: 12px 16px;
+        align-items: start;
+      }
+
+      h1 {
+        grid-area: title;
+        margin-bottom: 0;
+        font-size: 36px;
+        line-height: 1.05;
+      }
+
+      .subheading {
+        grid-area: subtitle;
+        margin-bottom: 2px;
+        font-size: 21px;
+        line-height: 1.2;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 0;
+      }
+
+      .wind-grid {
+        grid-area: wind;
+      }
+
+      .metrics-column {
+        grid-area: metrics;
+        display: grid;
+        gap: 12px;
+      }
+
+      .secondary-grid {
+        margin-top: 0;
+      }
+
+      .metric-card {
+        min-height: 126px;
+        padding: 15px 20px 14px;
+      }
+
+      .metric-label {
+        margin-bottom: 6px;
+        font-size: 20px;
+      }
+
+      .metric-value {
+        font-size: 58px;
+        line-height: 1.05;
+      }
+
+      .metric-detail {
+        margin-top: 5px;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .plot-panel {
+        grid-area: plot;
+        align-self: stretch;
+      }
+
+      .plot-frame {
+        min-height: 0;
+        height: 790px;
+        padding: 8px 8px 0;
+        align-items: flex-start;
+      }
+
+      .plot-frame svg {
+        max-height: 100%;
+      }
+
+      .plot-footer {
+        padding: 9px 12px 11px;
+        font-size: 16px;
+      }
+
+      .status {
+        font-size: 16px;
+      }
+    }
+
+    @media (min-width: 1000px) and (max-aspect-ratio: 1 / 1) {
+      body {
+        padding: 12px 16px 20px;
+      }
+
+      main {
+        max-width: 1168px;
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "title"
+          "subtitle"
+          "wind"
+          "plot"
+          "metrics";
+        gap: 12px;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .subheading {
+        margin-bottom: 0;
+        font-size: 24px;
+      }
+
+      .plot-frame {
+        height: 750px;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .wind-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .metric-card {
+        min-height: 126px;
+        padding: 14px 22px 13px;
+      }
+
+      .metric-label {
+        font-size: 21px;
+      }
+
+      .metric-value {
+        font-size: 62px;
+      }
+
+      .metric-detail {
+        font-size: 21px;
+      }
+    }
+
+    @media (min-width: 1000px) and (max-width: 1450px) and (max-aspect-ratio: 1 / 1) {
+      .wind-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 920px) {
@@ -220,7 +400,7 @@
     <h1 id="page-heading">Polar Wind Plot</h1>
     <p id="subheading" class="subheading">Awaiting history request</p>
 
-    <section class="summary-grid" aria-label="Wind summary">
+    <section class="summary-grid wind-grid" aria-label="Wind summary">
       <article class="metric-card">
         <p class="metric-label">Mean Wind</p>
         <p id="mean-wind" class="metric-value">-</p>
@@ -255,51 +435,53 @@
       </div>
     </section>
 
-    <section class="summary-grid secondary-grid" aria-label="Pressure summary">
-      <article class="metric-card">
-        <p class="metric-label">Mean Pressure</p>
-        <p id="mean-pressure" class="metric-value">-</p>
-        <p id="mean-pressure-detail" class="metric-detail">-</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Current Pressure</p>
-        <p id="current-pressure" class="metric-value">-</p>
-        <p id="current-pressure-detail" class="metric-detail">-</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Variability</p>
-        <p id="pressure-analysis" class="metric-value">-</p>
-        <p id="pressure-analysis-detail" class="metric-detail">-</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Trend</p>
-        <p id="pressure-trend" class="metric-value">-</p>
-        <p id="pressure-trend-detail" class="metric-detail">-</p>
-      </article>
-    </section>
+    <div class="metrics-column">
+      <section class="summary-grid secondary-grid" aria-label="Temperature summary">
+        <article class="metric-card">
+          <p class="metric-label">Mean Temperature</p>
+          <p id="mean-temperature" class="metric-value">-</p>
+          <p id="mean-temperature-detail" class="metric-detail">-</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Current Temperature</p>
+          <p id="current-temperature" class="metric-value">-</p>
+          <p id="current-temperature-detail" class="metric-detail">-</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Variability</p>
+          <p id="temperature-analysis" class="metric-value">-</p>
+          <p id="temperature-analysis-detail" class="metric-detail">-</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Trend</p>
+          <p id="temperature-trend" class="metric-value">-</p>
+          <p id="temperature-trend-detail" class="metric-detail">-</p>
+        </article>
+      </section>
 
-    <section class="summary-grid secondary-grid" aria-label="Temperature summary">
-      <article class="metric-card">
-        <p class="metric-label">Mean Temperature</p>
-        <p id="mean-temperature" class="metric-value">-</p>
-        <p id="mean-temperature-detail" class="metric-detail">-</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Current Temperature</p>
-        <p id="current-temperature" class="metric-value">-</p>
-        <p id="current-temperature-detail" class="metric-detail">-</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Variability</p>
-        <p id="temperature-analysis" class="metric-value">-</p>
-        <p id="temperature-analysis-detail" class="metric-detail">-</p>
-      </article>
-      <article class="metric-card">
-        <p class="metric-label">Trend</p>
-        <p id="temperature-trend" class="metric-value">-</p>
-        <p id="temperature-trend-detail" class="metric-detail">-</p>
-      </article>
-    </section>
+      <section class="summary-grid secondary-grid" aria-label="Pressure summary">
+        <article class="metric-card">
+          <p class="metric-label">Mean Pressure</p>
+          <p id="mean-pressure" class="metric-value">-</p>
+          <p id="mean-pressure-detail" class="metric-detail">-</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Current Pressure</p>
+          <p id="current-pressure" class="metric-value">-</p>
+          <p id="current-pressure-detail" class="metric-detail">-</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Variability</p>
+          <p id="pressure-analysis" class="metric-value">-</p>
+          <p id="pressure-analysis-detail" class="metric-detail">-</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Trend</p>
+          <p id="pressure-trend" class="metric-value">-</p>
+          <p id="pressure-trend-detail" class="metric-detail">-</p>
+        </article>
+      </section>
+    </div>
   </main>
 
   <script>
@@ -504,7 +686,7 @@
       const gridArcs = radialTicks.map((tick) => {
         const ratio = tick.ratio;
         const radius = innerRadius + ratio * (outerRadius - innerRadius);
-        return `<path d="${arcPath(centerX, centerY, radius, startAngle, endAngle)}" fill="none" stroke="${tick.isMajor ? "#3c4a58" : "#2b3744"}" stroke-width="${tick.isMajor ? 1.5 : 1}" />`;
+        return `<path d="${arcPath(centerX, centerY, radius, startAngle, endAngle)}" fill="none" stroke="${tick.isMajor ? "var(--plot-grid)" : "var(--plot-grid-soft)"}" stroke-width="${tick.isMajor ? 1.5 : 1}" />`;
       }).join("");
 
       const angleGrid = boundaryOffsets.map((offset) => {
@@ -514,8 +696,8 @@
         const outer = polarPoint(centerX, centerY, displayAngle, outerRadius);
         const labelPoint = polarPoint(centerX, centerY, displayAngle, outerRadius + 34);
         return `
-          <line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="#41505e" stroke-width="1.1" />
-          <text x="${labelPoint.x}" y="${labelPoint.y}" fill="#edf3f9" font-size="15" font-weight="600" text-anchor="middle">${escapeHtml(formatDegreesLabel(actualAngle))}</text>
+          <line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="var(--plot-grid)" stroke-width="1.1" />
+          <text x="${labelPoint.x}" y="${labelPoint.y}" fill="var(--text)" font-size="18" font-weight="700" text-anchor="middle">${escapeHtml(formatDegreesLabel(actualAngle))}</text>
         `;
       }).join("");
 
@@ -523,12 +705,12 @@
         const radius = innerRadius + tick.ratio * (outerRadius - innerRadius);
         const anchor = polarPoint(centerX, centerY, endAngle, radius);
         return `
-          <text x="${anchor.x + 16}" y="${anchor.y + 4}" fill="#edf3f9" font-size="15" font-weight="${tick.isMajor ? "600" : "400"}">${escapeHtml(formatTimeLabel(tick.time))}</text>
+          <text x="${anchor.x + 16}" y="${anchor.y + 4}" fill="var(--text)" font-size="18" font-weight="${tick.isMajor ? "700" : "500"}">${escapeHtml(formatTimeLabel(tick.time))}</text>
         `;
       }).join("");
 
       const sectorShell = `
-        <path d="${wedgePath(centerX, centerY, innerRadius, outerRadius, startAngle, endAngle)}" fill="#0f161d" stroke="#6c7a88" stroke-width="2" />
+        <path d="${wedgePath(centerX, centerY, innerRadius, outerRadius, startAngle, endAngle)}" fill="var(--plot-shell)" stroke="var(--plot-shell-stroke)" stroke-width="2" />
       `;
 
       const meanOuter = polarPoint(centerX, centerY, DISPLAY_CENTER_ANGLE, outerRadius);
@@ -542,11 +724,11 @@
           ${gridArcs}
           ${angleGrid}
           ${radialLabels}
-          <path d="${polylinePath(samplePoints)}" fill="none" stroke="rgb(150 161 173 / 50%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="${polylinePath(averagePoints)}" fill="none" stroke="#66f285" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
-          <line x1="${meanInner.x}" y1="${meanInner.y}" x2="${meanOuter.x}" y2="${meanOuter.y}" stroke="#de4b52" stroke-width="4" stroke-linecap="round" />
-          <circle cx="${latestAverage.x}" cy="${latestAverage.y}" r="6" fill="#de4b52" />
-          <circle cx="${latestSample.x}" cy="${latestSample.y}" r="4" fill="#c7d0d8" />
+          <path d="${polylinePath(samplePoints)}" fill="none" stroke="var(--sample-line)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${polylinePath(averagePoints)}" fill="none" stroke="var(--average-line)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" />
+          <line x1="${meanInner.x}" y1="${meanInner.y}" x2="${meanOuter.x}" y2="${meanOuter.y}" stroke="var(--mean-line)" stroke-width="4.5" stroke-linecap="round" />
+          <circle cx="${latestAverage.x}" cy="${latestAverage.y}" r="7" fill="var(--mean-line)" />
+          <circle cx="${latestSample.x}" cy="${latestSample.y}" r="5" fill="#324958" />
         </svg>
       `;
     }

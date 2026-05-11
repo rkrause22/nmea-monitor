@@ -10,6 +10,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 
+LOG_RETENTION_DAYS = 365
+
+
 def format_utc_datetime(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
@@ -234,9 +237,7 @@ def log_exception(
     sentence: Any | None = None,
     include_traceback: bool = False,
 ) -> None:
-    logs_dir = logs_directory(script_file)
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_path = os.path.join(logs_dir, f"{program_name}-{today}.log")
+    log_path = daily_log_path(program_name, script_file)
     timestamp = log_timestamp()
     with open(log_path, "a", encoding="utf-8") as handle:
         handle.write(f"{timestamp} [ERROR] {program_name} - {message}: {exc}\n")
@@ -253,9 +254,7 @@ def log_exception(
 
 
 def log_error_message(program_name: str, script_file: str, message: str) -> None:
-    logs_dir = logs_directory(script_file)
-    today = datetime.now().strftime("%Y-%m-%d")
-    log_path = os.path.join(logs_dir, f"{program_name}-{today}.log")
+    log_path = daily_log_path(program_name, script_file)
     with open(log_path, "a", encoding="utf-8") as handle:
         handle.write(f"{log_timestamp()} [ERROR] {program_name} - {message}\n")
 
@@ -265,6 +264,31 @@ def logs_directory(script_file: str) -> str:
     logs_dir = os.path.join(script_dir, "logs")
     os.makedirs(logs_dir, exist_ok=True)
     return logs_dir
+
+
+def daily_log_path(program_name: str, script_file: str) -> str:
+    logs_dir = logs_directory(script_file)
+    today = datetime.now().strftime("%Y-%m-%d")
+    log_path = os.path.join(logs_dir, f"{program_name}-{today}.log")
+    if not os.path.exists(log_path):
+        cleanup_old_log_files(logs_dir)
+    return log_path
+
+
+def cleanup_old_log_files(logs_dir: str) -> None:
+    cutoff = datetime.now() - timedelta(days=LOG_RETENTION_DAYS)
+    for entry in os.scandir(logs_dir):
+        if not entry.is_file():
+            continue
+        try:
+            modified = datetime.fromtimestamp(entry.stat().st_mtime)
+        except OSError:
+            continue
+        if modified < cutoff:
+            try:
+                os.remove(entry.path)
+            except OSError:
+                continue
 
 
 def log_timestamp() -> str:

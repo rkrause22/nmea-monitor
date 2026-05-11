@@ -87,7 +87,7 @@ Authorization notes:
 ### check standard installation
 * `python3 --version` # Python `3.13.5`
 * `sudo apt install python3-pip`
-* `sudo nmtui` # determine IP address eg. `192.168.1.10`
+* `sudo nmtui` # determine IP address eg. `192.168.1.10`, setup wifi etc
 * You might also want to install CUPS/SAMBA to enable AirPrint
 
 ### Install and open firewall
