@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read NMEA-0183 sentences and emit JSON batches delimited by ZDA sentences."""
+"""Read NMEA-0183 sentences and emit filtered or aggregated JSON batches."""
 
 from __future__ import annotations
 
@@ -14,13 +14,12 @@ import urllib.error
 import urllib.request
 from collections import deque
 from functools import partial
-from typing import Iterable, Optional
+from typing import Optional
 
 from nmea_aggregation import (
     FrameAggregator,
     NMEAError,
     NMEASentence,
-    combine_frames,
     parse_sentence,
     parse_zda_datetime,
 )
@@ -41,6 +40,7 @@ except ImportError:  # pragma: no cover - depends on local environment
 COMMON_BAUD_RATES = [4800, 9600, 19200, 38400, 57600, 115200]
 DEFAULT_FILTER_TYPES = ["ZDA", "MWD", "MDA", "GGA"]
 PERMITTED_AGGREGATE_TYPES = ("MWD", "MDA", "GGA")
+RAW_SENTENCE_PATTERN = re.compile(r"\$[^$\r\n]*\*[0-9A-Fa-f]{2}")
 PREFERRED_DEVICE_NAMES = [
     "/dev/serial0",
     "/dev/ttyAMA0",
@@ -105,6 +105,25 @@ class SerialStream(InputStream):
         self.connection.close()
 
 
+class SentenceReader:
+    def __init__(self, stream: InputStream) -> None:
+        self.stream = stream
+        self.pending_sentences: deque[NMEASentence] = deque()
+
+    def next_valid_sentence(self) -> Optional[NMEASentence]:
+        while True:
+            if self.pending_sentences:
+                return self.pending_sentences.popleft()
+
+            for raw in self.stream:
+                if not raw.strip():
+                    continue
+                self.pending_sentences.extend(parse_valid_sentences(raw))
+                if self.pending_sentences:
+                    return self.pending_sentences.popleft()
+            return None
+
+
 def parse_filter_types(value: str) -> set[str]:
     sentence_types = {item.strip().upper() for item in value.split(",") if item.strip()}
     if not sentence_types:
@@ -117,6 +136,20 @@ def parse_filter_types(value: str) -> set[str]:
     if "ZDA" not in sentence_types:
         raise argparse.ArgumentTypeError("--filter must include ZDA")
     return sentence_types
+
+
+def extract_sentence_candidates(raw_line: str) -> list[str]:
+    return [match.group(0) for match in RAW_SENTENCE_PATTERN.finditer(raw_line)]
+
+
+def parse_valid_sentences(raw_line: str) -> list[NMEASentence]:
+    sentences: list[NMEASentence] = []
+    for candidate in extract_sentence_candidates(raw_line):
+        try:
+            sentences.append(parse_sentence(candidate))
+        except NMEAError:
+            continue
+    return sentences
 
 
 def open_serial_stream(port: str, baudrate: int, timeout: float = 1.0) -> SerialStream:
@@ -161,11 +194,9 @@ def port_has_valid_nmea(port: str, baudrate: int, probe_seconds: float) -> bool:
             raw = connection.readline()
             if raw == b"":
                 continue
-            try:
-                parse_sentence(raw.decode("ascii", errors="ignore"))
+            decoded = raw.decode("ascii", errors="ignore")
+            if parse_valid_sentences(decoded):
                 return True
-            except NMEAError:
-                continue
     finally:
         connection.close()
     return False
@@ -259,24 +290,12 @@ def scan_for_nmea_stream(probe_seconds: float) -> SerialStream:
                 time.sleep(min(SERIAL_RETRY_DELAY_SECONDS, remaining_seconds))
 
 
-def next_valid_sentence(stream: Iterable[str]) -> Optional[NMEASentence]:
-    for raw in stream:
-        if not raw.strip():
-            continue
-        try:
-            return parse_sentence(raw)
-        except NMEAError as exc:
-            log_exception("invalid NMEA sentence skipped", exc, raw)
-            continue
-    return None
-
-
-def read_until_first_zda(stream: Iterable[str]) -> NMEASentence:
+def read_until_first_zda(reader: SentenceReader) -> NMEASentence:
     wait_started_at = time.monotonic()
     next_warning_at = wait_started_at + ZDA_WARNING_INTERVAL_SECONDS
     timeout_at = wait_started_at + ZDA_TIMEOUT_SECONDS
 
-    for raw in stream:
+    while True:
         now = time.monotonic()
         if now >= timeout_at:
             message = "timed out after 10 minutes waiting for a valid ZDA sentence"
@@ -292,12 +311,9 @@ def read_until_first_zda(stream: Iterable[str]) -> NMEASentence:
             log_error_message(message)
             next_warning_at += ZDA_WARNING_INTERVAL_SECONDS
 
-        if not raw.strip():
-            continue
-        try:
-            sentence = parse_sentence(raw)
-        except NMEAError:
-            continue
+        sentence = reader.next_valid_sentence()
+        if sentence is None:
+            raise RuntimeError("the input ended before a valid ZDA sentence was received")
         if sentence.sentence_type != "ZDA":
             continue
         try:
@@ -305,8 +321,6 @@ def read_until_first_zda(stream: Iterable[str]) -> NMEASentence:
             return sentence
         except NMEAError:
             continue
-
-    raise RuntimeError("the input ended before a valid ZDA sentence was received")
 
 
 def upload_payload(
@@ -343,20 +357,19 @@ def get_raw_sentence(sentence: NMEASentence | str) -> str:
 
 
 def build_aggregated_buffer(
-    starting_zda: NMEASentence,
-    frame_window: deque[FrameAggregator],
+    output_zda: NMEASentence,
+    frame_aggregator: FrameAggregator,
     filter_types: set[str],
 ) -> list[str]:
-    combined_frame = combine_frames(list(frame_window))
     sentences: list[str] = []
     if "ZDA" in filter_types:
-        sentences.append(starting_zda.raw)
-    if "MWD" in filter_types and combined_frame.mwd.has_data():
-        sentences.append(combined_frame.mwd.average_sentence())
-    if "MDA" in filter_types and combined_frame.mda.has_data():
-        sentences.append(combined_frame.mda.average_sentence())
-    if "GGA" in filter_types and combined_frame.gga.has_data():
-        sentences.append(combined_frame.gga.average_sentence())
+        sentences.append(output_zda.raw)
+    if "MWD" in filter_types and frame_aggregator.mwd.has_data():
+        sentences.append(frame_aggregator.mwd.average_sentence())
+    if "MDA" in filter_types and frame_aggregator.mda.has_data():
+        sentences.append(frame_aggregator.mda.average_sentence())
+    if "GGA" in filter_types and frame_aggregator.gga.has_data():
+        sentences.append(frame_aggregator.gga.average_sentence())
     return sentences
 
 
@@ -398,11 +411,12 @@ def emit_buffer(
 
 
 def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
+    reader = SentenceReader(stream)
     if args.aggregation > 0:
-        process_aggregated_stream(stream, args)
+        process_aggregated_stream(reader, args)
         return
 
-    interval_start_zda = read_until_first_zda(stream)
+    interval_start_zda = read_until_first_zda(reader)
     last_sentence = interval_start_zda
     buffer: list[NMEASentence] = []
 
@@ -411,7 +425,7 @@ def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
             buffer.append(last_sentence)
 
         while True:
-            new_sentence = next_valid_sentence(stream)
+            new_sentence = reader.next_valid_sentence()
             if new_sentence is None:
                 emit_buffer(args, buffer, interval_start_zda, None)
                 break
@@ -420,8 +434,7 @@ def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
             try:
                 parse_zda_datetime(new_sentence)
                 break
-            except NMEAError as exc:
-                log_exception("invalid ZDA sentence skipped", exc, new_sentence)
+            except NMEAError:
                 continue
 
         if new_sentence is None:
@@ -435,54 +448,53 @@ def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
         last_sentence = new_sentence
 
 
-def process_aggregated_stream(stream: InputStream, args: argparse.Namespace) -> None:
-    interval_start_zda = read_until_first_zda(stream)
-    last_sentence = interval_start_zda
+def process_aggregated_stream(reader: SentenceReader, args: argparse.Namespace) -> None:
+    interval_start_zda = read_until_first_zda(reader)
+    output_zda = interval_start_zda
     current_frame = FrameAggregator()
-    frame_window: deque[FrameAggregator] = deque(maxlen=args.aggregation)
+    completed_intervals = 0
 
     while True:
-        if last_sentence.sentence_type in PERMITTED_AGGREGATE_TYPES:
-            try:
-                current_frame.add_sentence(last_sentence)
-            except NMEAError as exc:
-                log_exception("invalid aggregate sentence skipped", exc, last_sentence)
-
-        while True:
-            new_sentence = next_valid_sentence(stream)
-            if new_sentence is None:
-                frame_window.append(current_frame)
-                buffer = build_aggregated_buffer(
-                    interval_start_zda,
-                    frame_window,
-                    args.filter,
-                )
-                emit_buffer(args, buffer, interval_start_zda, None)
-                break
-            if new_sentence.sentence_type != "ZDA":
-                break
-            try:
-                parse_zda_datetime(new_sentence)
-                break
-            except NMEAError as exc:
-                log_exception("invalid ZDA sentence skipped", exc, new_sentence)
-                continue
-
+        new_sentence = reader.next_valid_sentence()
         if new_sentence is None:
+            buffer = build_aggregated_buffer(
+                output_zda,
+                current_frame,
+                args.filter,
+            )
+            emit_buffer(args, buffer, interval_start_zda, None)
             break
 
-        if new_sentence.sentence_type == "ZDA":
-            frame_window.append(current_frame)
+        if new_sentence.sentence_type in PERMITTED_AGGREGATE_TYPES:
+            try:
+                current_frame.add_sentence(new_sentence)
+            except NMEAError:
+                pass
+            continue
+
+        if new_sentence.sentence_type != "ZDA":
+            continue
+
+        try:
+            parse_zda_datetime(new_sentence)
+        except NMEAError:
+            continue
+
+        completed_intervals += 1
+        if completed_intervals >= args.aggregation:
             buffer = build_aggregated_buffer(
-                interval_start_zda,
-                frame_window,
+                output_zda,
+                current_frame,
                 args.filter,
             )
             emit_buffer(args, buffer, interval_start_zda, new_sentence)
             interval_start_zda = new_sentence
+            output_zda = new_sentence
             current_frame = FrameAggregator()
+            completed_intervals = 0
+            continue
 
-        last_sentence = new_sentence
+        output_zda = new_sentence
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -491,7 +503,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
         raise RuntimeError("DEFAULT_FILTER_TYPES must include ZDA")
 
     parser = argparse.ArgumentParser(
-        description="Read NMEA-0183 sentences from a file or COM port, filter and emit to file or ZDA-delimited JSON."
+        description="Read NMEA-0183 sentences from a file or COM port, then filter or aggregate valid sentences for output."
     )
     parser.fromfile_prefix_chars = "@"
     parser.convert_arg_line_to_args = shlex.split
@@ -540,8 +552,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "-g",
         "--aggregation",
         type=int,
-        default=0,
-        help="Number of ZDA frames to aggregate over (default: 0, disabled)",
+        default=1,
+        help="Number of valid ZDA intervals to aggregate over before emitting (default: 1; use 0 to disable)",
     )
     parser.add_argument(
         "-a",
