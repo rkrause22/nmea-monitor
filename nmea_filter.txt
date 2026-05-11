@@ -1,5 +1,0 @@
--u http://127.0.0.1:5000/nmea/add/MyOrg/MyDevice
--a my-api-key
--p COM6
--g 2
---debug
