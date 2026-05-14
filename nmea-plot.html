@@ -76,12 +76,80 @@
     }
 
     .metric-card {
+      position: relative;
+      isolation: isolate;
       min-height: 104px;
       padding: 14px 16px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
       border-radius: 6px;
       box-shadow: 0 5px 16px rgb(18 42 58 / 12%);
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: var(--metric-bg, var(--panel-bg));
+    }
+
+    .metric-card.highlighted {
+      --metric-bg: linear-gradient(
+        90deg,
+        rgb(var(--metric-accent-rgb) / 34%) 0%,
+        rgb(var(--metric-accent-rgb) / 34%) var(--metric-fill, 0%),
+        rgb(var(--metric-accent-rgb) / 13%) var(--metric-fill, 0%),
+        rgb(var(--metric-accent-rgb) / 7%) 100%
+      );
+      border-color: rgb(var(--metric-accent-rgb) / 72%);
+    }
+
+    .metric-card.highlighted::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 8px;
+      width: var(--metric-fill, 0%);
+      background: rgb(var(--metric-accent-rgb));
+    }
+
+    .metric-card.has-direction {
+      padding-right: 118px;
+    }
+
+    .wind-direction-arrow {
+      position: absolute;
+      top: 20px;
+      right: 18px;
+      bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      justify-items: center;
+      align-items: center;
+      width: 76px;
+      color: rgb(var(--metric-accent-rgb, 255 255 255));
+      text-shadow: 0 1px 0 rgb(255 255 255 / 70%);
+    }
+
+    .wind-direction-glyph {
+      display: block;
+      font-size: 58px;
+      font-weight: 900;
+      line-height: 0.8;
+      transform: rotate(var(--wind-arrow-rotation, 0deg));
+      transform-origin: 50% 50%;
+      -webkit-text-stroke: 1px currentColor;
+    }
+
+    .wind-direction-label {
+      color: var(--wind-direction-label-color, rgb(255 255 255 / 0%));
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
     }
 
     .metric-label {
@@ -251,6 +319,25 @@
         padding: 15px 20px 14px;
       }
 
+      .metric-card.has-direction {
+        padding-right: 132px;
+      }
+
+      .wind-direction-arrow {
+        top: 24px;
+        right: 22px;
+        bottom: 12px;
+        width: 86px;
+      }
+
+      .wind-direction-glyph {
+        font-size: 68px;
+      }
+
+      .wind-direction-label {
+        font-size: 24px;
+      }
+
       .metric-label {
         margin-bottom: 6px;
         font-size: 20px;
@@ -337,6 +424,10 @@
         padding: 14px 22px 13px;
       }
 
+      .metric-card.has-direction {
+        padding-right: 138px;
+      }
+
       .metric-label {
         font-size: 21px;
       }
@@ -401,15 +492,23 @@
     <p id="subheading" class="subheading">Awaiting history request</p>
 
     <section class="summary-grid wind-grid" aria-label="Wind summary">
-      <article class="metric-card">
+      <article id="mean-wind-card" class="metric-card has-direction">
         <p class="metric-label">Mean Wind</p>
         <p id="mean-wind" class="metric-value">-</p>
         <p id="mean-wind-detail" class="metric-detail">-</p>
+        <div class="wind-direction-arrow" aria-hidden="true">
+          <span id="mean-wind-arrow" class="wind-direction-glyph">↑</span>
+          <span id="mean-wind-arrow-label" class="wind-direction-label">-</span>
+        </div>
       </article>
-      <article class="metric-card">
+      <article id="current-wind-card" class="metric-card has-direction">
         <p class="metric-label">Current Wind</p>
         <p id="current-wind" class="metric-value">-</p>
         <p id="current-wind-detail" class="metric-detail">-</p>
+        <div class="wind-direction-arrow" aria-hidden="true">
+          <span id="current-wind-arrow" class="wind-direction-glyph">↑</span>
+          <span id="current-wind-arrow-label" class="wind-direction-label">-</span>
+        </div>
       </article>
       <article class="metric-card">
         <p class="metric-label">Oscillation</p>
@@ -437,12 +536,12 @@
 
     <div class="metrics-column">
       <section class="summary-grid secondary-grid" aria-label="Temperature summary">
-        <article class="metric-card">
+        <article id="mean-temperature-card" class="metric-card">
           <p class="metric-label">Mean Temperature</p>
           <p id="mean-temperature" class="metric-value">-</p>
           <p id="mean-temperature-detail" class="metric-detail">-</p>
         </article>
-        <article class="metric-card">
+        <article id="current-temperature-card" class="metric-card">
           <p class="metric-label">Current Temperature</p>
           <p id="current-temperature" class="metric-value">-</p>
           <p id="current-temperature-detail" class="metric-detail">-</p>
@@ -460,12 +559,12 @@
       </section>
 
       <section class="summary-grid secondary-grid" aria-label="Pressure summary">
-        <article class="metric-card">
+        <article id="mean-pressure-card" class="metric-card">
           <p class="metric-label">Mean Pressure</p>
           <p id="mean-pressure" class="metric-value">-</p>
           <p id="mean-pressure-detail" class="metric-detail">-</p>
         </article>
-        <article class="metric-card">
+        <article id="current-pressure-card" class="metric-card">
           <p class="metric-label">Current Pressure</p>
           <p id="current-pressure" class="metric-value">-</p>
           <p id="current-pressure-detail" class="metric-detail">-</p>
@@ -490,29 +589,42 @@
     const DISPLAY_CENTER_ANGLE = 0;
     const RANGE_STEP_DEGREES = 5;
     const RANGE_PADDING_DEGREES = 5;
+    const WIND_HIGHLIGHT_RANGE_KN = { minimum: 0, maximum: 64 };
+    const TEMPERATURE_HIGHLIGHT_RANGE_C = { minimum: 5, maximum: 35 };
+    const PRESSURE_HIGHLIGHT_RANGE_MB = { minimum: 990, maximum: 1030 };
     const PAGE_QUERY = new URLSearchParams(window.location.search);
 
     const elements = {
       heading: document.getElementById("page-heading"),
       subheading: document.getElementById("subheading"),
+      meanWindCard: document.getElementById("mean-wind-card"),
       meanWind: document.getElementById("mean-wind"),
       meanWindDetail: document.getElementById("mean-wind-detail"),
+      meanWindArrow: document.getElementById("mean-wind-arrow"),
+      meanWindArrowLabel: document.getElementById("mean-wind-arrow-label"),
+      currentWindCard: document.getElementById("current-wind-card"),
       currentWind: document.getElementById("current-wind"),
       currentWindDetail: document.getElementById("current-wind-detail"),
+      currentWindArrow: document.getElementById("current-wind-arrow"),
+      currentWindArrowLabel: document.getElementById("current-wind-arrow-label"),
       oscillation: document.getElementById("oscillation"),
       oscillationDetail: document.getElementById("oscillation-detail"),
       shift: document.getElementById("shift"),
       shiftDetail: document.getElementById("shift-detail"),
+      meanPressureCard: document.getElementById("mean-pressure-card"),
       meanPressure: document.getElementById("mean-pressure"),
       meanPressureDetail: document.getElementById("mean-pressure-detail"),
+      currentPressureCard: document.getElementById("current-pressure-card"),
       currentPressure: document.getElementById("current-pressure"),
       currentPressureDetail: document.getElementById("current-pressure-detail"),
       pressureAnalysis: document.getElementById("pressure-analysis"),
       pressureAnalysisDetail: document.getElementById("pressure-analysis-detail"),
       pressureTrend: document.getElementById("pressure-trend"),
       pressureTrendDetail: document.getElementById("pressure-trend-detail"),
+      meanTemperatureCard: document.getElementById("mean-temperature-card"),
       meanTemperature: document.getElementById("mean-temperature"),
       meanTemperatureDetail: document.getElementById("mean-temperature-detail"),
+      currentTemperatureCard: document.getElementById("current-temperature-card"),
       currentTemperature: document.getElementById("current-temperature"),
       currentTemperatureDetail: document.getElementById("current-temperature-detail"),
       temperatureAnalysis: document.getElementById("temperature-analysis"),
@@ -585,6 +697,8 @@
       elements.meanWindDetail.textContent = displayValue(wind.mean?.detail);
       elements.currentWind.textContent = displayValue(wind.current?.headline);
       elements.currentWindDetail.textContent = displayValue(wind.current?.detail);
+      applyWindHighlight(elements.meanWindCard, wind.mean, elements.meanWindArrow, elements.meanWindArrowLabel);
+      applyWindHighlight(elements.currentWindCard, wind.current, elements.currentWindArrow, elements.currentWindArrowLabel);
       elements.oscillation.textContent = displayValue(wind.analysis?.headline);
       elements.oscillationDetail.textContent = displayValue(wind.analysis?.detail);
       elements.shift.textContent = displayValue(wind.trend?.headline);
@@ -594,6 +708,8 @@
       elements.meanPressureDetail.textContent = displayValue(pressure.mean?.detail);
       elements.currentPressure.textContent = displayValue(pressure.current?.headline);
       elements.currentPressureDetail.textContent = displayValue(pressure.current?.detail);
+      applyMetricHighlight(elements.meanPressureCard, pressure.mean?.measurement, PRESSURE_HIGHLIGHT_RANGE_MB, pressureToMb);
+      applyMetricHighlight(elements.currentPressureCard, pressure.current?.measurement, PRESSURE_HIGHLIGHT_RANGE_MB, pressureToMb);
       elements.pressureAnalysis.textContent = displayValue(pressure.analysis?.headline);
       elements.pressureAnalysisDetail.textContent = displayValue(pressure.analysis?.detail);
       elements.pressureTrend.textContent = displayValue(pressure.trend?.headline);
@@ -603,10 +719,147 @@
       elements.meanTemperatureDetail.textContent = displayValue(temperature.mean?.detail);
       elements.currentTemperature.textContent = displayValue(temperature.current?.headline);
       elements.currentTemperatureDetail.textContent = displayValue(temperature.current?.detail);
+      applyMetricHighlight(elements.meanTemperatureCard, temperature.mean?.measurement, TEMPERATURE_HIGHLIGHT_RANGE_C, temperatureToCelsius);
+      applyMetricHighlight(elements.currentTemperatureCard, temperature.current?.measurement, TEMPERATURE_HIGHLIGHT_RANGE_C, temperatureToCelsius);
       elements.temperatureAnalysis.textContent = displayValue(temperature.analysis?.headline);
       elements.temperatureAnalysisDetail.textContent = displayValue(temperature.analysis?.detail);
       elements.temperatureTrend.textContent = displayValue(temperature.trend?.headline);
       elements.temperatureTrendDetail.textContent = displayValue(temperature.trend?.detail);
+    }
+
+    function applyWindHighlight(card, analysis, arrow, arrowLabel) {
+      const speed = measurementValue(analysis?.speed);
+      const direction = measurementValue(analysis?.direction);
+      const symbol = typeof analysis?.direction?.symbol === "string" ? analysis.direction.symbol : directionToCompass(direction);
+
+      applyHighlight(card, speed, WIND_HIGHLIGHT_RANGE_KN, windStrengthColor);
+
+      if (Number.isFinite(direction)) {
+        arrow.style.setProperty("--wind-arrow-rotation", `${normalizeDegrees(direction)}deg`);
+        arrowLabel.style.setProperty("--wind-direction-label-color", "var(--text)");
+        arrowLabel.textContent = symbol || "-";
+      } else {
+        arrow.style.removeProperty("--wind-arrow-rotation");
+        arrowLabel.style.removeProperty("--wind-direction-label-color");
+        arrowLabel.textContent = "-";
+      }
+    }
+
+    function applyMetricHighlight(card, measurement, range, converter) {
+      const value = converter(measurement);
+      applyHighlight(card, value, range, blueGreenRedColor);
+    }
+
+    function applyHighlight(card, value, range, colorScale) {
+      if (!card || !Number.isFinite(value)) {
+        clearHighlight(card);
+        return;
+      }
+
+      const ratio = ratioInRange(value, range.minimum, range.maximum);
+      const color = colorScale(ratio);
+      card.classList.add("highlighted");
+      card.style.setProperty("--metric-fill", `${Math.round(ratio * 100)}%`);
+      card.style.setProperty("--metric-accent-rgb", color.join(" "));
+    }
+
+    function clearHighlight(card) {
+      if (!card) {
+        return;
+      }
+      card.classList.remove("highlighted");
+      card.style.removeProperty("--metric-fill");
+      card.style.removeProperty("--metric-accent-rgb");
+    }
+
+    function windStrengthColor(ratio) {
+      return colorRamp(ratio, [
+        { stop: 0.00, color: [237, 250, 255] },
+        { stop: 0.05, color: [184, 229, 255] },
+        { stop: 0.09, color: [34, 220, 42] },
+        { stop: 0.16, color: [151, 240, 74] },
+        { stop: 0.25, color: [255, 231, 0] },
+        { stop: 0.33, color: [255, 178, 0] },
+        { stop: 0.42, color: [231, 42, 38] },
+        { stop: 0.63, color: [126, 0, 0] },
+        { stop: 0.73, color: [214, 26, 180] },
+        { stop: 0.98, color: [93, 38, 158] },
+        { stop: 1.00, color: [55, 18, 112] },
+      ]);
+    }
+
+    function blueGreenRedColor(ratio) {
+      return colorRamp(ratio, [
+        { stop: 0.00, color: [44, 116, 214] },
+        { stop: 0.50, color: [52, 168, 83] },
+        { stop: 1.00, color: [211, 55, 55] },
+      ]);
+    }
+
+    function colorRamp(ratio, stops) {
+      const value = clamp(ratio, 0, 1);
+      let left = stops[0];
+      let right = stops[stops.length - 1];
+
+      for (let index = 1; index < stops.length; index += 1) {
+        if (value <= stops[index].stop) {
+          left = stops[index - 1];
+          right = stops[index];
+          break;
+        }
+      }
+
+      const span = Math.max(right.stop - left.stop, 0.0001);
+      const localRatio = (value - left.stop) / span;
+      return left.color.map((channel, index) => Math.round(channel + (right.color[index] - channel) * localRatio));
+    }
+
+    function ratioInRange(value, minimum, maximum) {
+      return clamp((value - minimum) / (maximum - minimum), 0, 1);
+    }
+
+    function temperatureToCelsius(measurement) {
+      const value = measurementValue(measurement);
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      const units = measurementUnits(measurement, "C").toLowerCase();
+      if (units === "f" || units === "fahrenheit") {
+        return (value - 32) * 5 / 9;
+      }
+      return value;
+    }
+
+    function pressureToMb(measurement) {
+      const value = measurementValue(measurement);
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      const units = measurementUnits(measurement, "mb").toLowerCase();
+      if (units === "inhg") {
+        return value * 33.8638866667;
+      }
+      if (units === "bar") {
+        return value * 1000;
+      }
+      return value;
+    }
+
+    function measurementUnits(measurement, defaultUnits = "") {
+      if (!measurement || typeof measurement !== "object") {
+        return defaultUnits;
+      }
+      return typeof measurement.units === "string" && measurement.units.trim() ? measurement.units : defaultUnits;
+    }
+
+    function directionToCompass(value) {
+      if (!Number.isFinite(value)) {
+        return "-";
+      }
+      const points = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+      return points[Math.round(normalizeDegrees(value) / 22.5) % points.length];
     }
 
     function extractWindSamples(records) {
