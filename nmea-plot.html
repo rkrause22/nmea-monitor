@@ -746,7 +746,7 @@
       applyHighlight(card, speed, WIND_HIGHLIGHT_RANGE_KN, windStrengthColor);
 
       if (Number.isFinite(direction)) {
-        arrow.style.setProperty("--wind-arrow-rotation", `${normalizeDegrees(direction)}deg`);
+        arrow.style.setProperty("--wind-arrow-rotation", `${normalizeDegrees(direction - 180)}deg`);
         arrowLabel.style.setProperty("--wind-direction-label-color", "var(--text)");
         arrowLabel.textContent = symbol || "-";
       } else {
