@@ -121,9 +121,9 @@
 
     .wind-direction-arrow {
       position: absolute;
-      top: 20px;
+      top: 28px;
       right: 18px;
-      bottom: 10px;
+      bottom: 8px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -136,12 +136,18 @@
 
     .wind-direction-glyph {
       display: block;
-      font-size: 58px;
-      font-weight: 900;
-      line-height: 0.8;
+      width: 58px;
+      height: 58px;
       transform: rotate(var(--wind-arrow-rotation, 0deg));
       transform-origin: 50% 50%;
-      -webkit-text-stroke: 1px currentColor;
+      filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%));
+    }
+
+    .wind-direction-glyph path {
+      fill: currentColor;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linejoin: round;
     }
 
     .wind-direction-label {
@@ -324,14 +330,15 @@
       }
 
       .wind-direction-arrow {
-        top: 24px;
+        top: 34px;
         right: 22px;
-        bottom: 12px;
+        bottom: 10px;
         width: 86px;
       }
 
       .wind-direction-glyph {
-        font-size: 68px;
+        width: 68px;
+        height: 68px;
       }
 
       .wind-direction-label {
@@ -497,7 +504,9 @@
         <p id="mean-wind" class="metric-value">-</p>
         <p id="mean-wind-detail" class="metric-detail">-</p>
         <div class="wind-direction-arrow" aria-hidden="true">
-          <span id="mean-wind-arrow" class="wind-direction-glyph">↑</span>
+          <svg id="mean-wind-arrow" class="wind-direction-glyph" viewBox="0 0 36 36" focusable="false">
+            <path d="M18 3 L30 20 H23 V33 H13 V20 H6 Z" />
+          </svg>
           <span id="mean-wind-arrow-label" class="wind-direction-label">-</span>
         </div>
       </article>
@@ -506,7 +515,9 @@
         <p id="current-wind" class="metric-value">-</p>
         <p id="current-wind-detail" class="metric-detail">-</p>
         <div class="wind-direction-arrow" aria-hidden="true">
-          <span id="current-wind-arrow" class="wind-direction-glyph">↑</span>
+          <svg id="current-wind-arrow" class="wind-direction-glyph" viewBox="0 0 36 36" focusable="false">
+            <path d="M18 3 L30 20 H23 V33 H13 V20 H6 Z" />
+          </svg>
           <span id="current-wind-arrow-label" class="wind-direction-label">-</span>
         </div>
       </article>

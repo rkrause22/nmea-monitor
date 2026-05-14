@@ -9,9 +9,9 @@ The page is intentionally lightweight: a single responsive table, a dynamic titl
 
 ## nmea_filter.py
 
-`nmea_filter.py` is a command-line tool that reads NMEA-0183 data from either a serial port or an input text file, groups the stream into ZDA-delimited time frames, and emits filtered or aggregated output for downstream storage or upload. It can auto-discover a live NMEA serial source, wait for the first valid ZDA before starting, and then collect only the requested sentence types, with `ZDA,MWD,MDA,GGA` as the default filter.
+`nmea_filter.py` is a command-line tool that reads NMEA-0183 data from either a serial port or an input text file, salvages any valid embedded NMEA sentences from each incoming line, and emits filtered or aggregated output for downstream storage or upload. It can auto-discover a live NMEA serial source, wait for the first valid `ZDA` before starting, and then collect only the requested sentence types, with `ZDA,MWD,MDA,GGA` as the default filter.
 
-When aggregation is enabled, it reduces each ZDA frame to one representative record per supported type by averaging wind, meteorological, and GPS data over the selected window, using circular averaging for directional fields and geographic averaging for latitude/longitude. Output can be written to stdout for debugging, saved as `.nmea` files, or uploaded as JSON to a configured API endpoint. The program also includes retry logic for serial/API failures and writes exceptions to dated log files under `logs/`.
+By default, aggregation is enabled with `-s 1`, which means the program tries to collect one valid sample of each requested secondary type (`MWD`, `MDA`, `GGA`) before emitting a batch. The batch stays open until either all requested secondary types reach their sample target or the `-x/--max-zda-seek` limit is reached, using valid `ZDA` sentences as the time anchor. Each aggregated batch contains at most one `ZDA`, one averaged `MWD`, one averaged `MDA`, and one averaged `GGA`. If `-s 0` is used, aggregation is disabled and every valid filtered sentence is emitted. Directional values use circular averaging and GPS positions use geographic averaging. Output can be written to stdout for debugging, saved as `.nmea` files, or uploaded as JSON to a configured API endpoint. The program also includes retry logic for serial/API failures and writes exceptions to dated log files under `logs/`.
 
 Usage: see `--help` options.
 
@@ -144,7 +144,7 @@ server {
 
 ### Test nmea_filter.py
 * `source venv/bin/activate`
-* `python3 nmea_filter.py -u http://127.0.0.1:8080/nmea/add/WSC/Barge -a MyApiKey`
+* `python3 nmea_filter.py -u http://127.0.0.1:8080/nmea/add/WSC/Barge -a MyApiKey -s 1 -x 5`
 * `deactivate`
 
 ### Create nmea_repository.service
@@ -195,7 +195,8 @@ WantedBy=multi-user.target
 ```text
 -u http://127.0.0.1:8080/nmea/add/WSC/Barge
 -a MyApiKey
--g 3
+-s 1
+-x 5
 ```
 * `sudo systemctl daemon-reload`
 * `sudo systemctl start nmea_filter.service`

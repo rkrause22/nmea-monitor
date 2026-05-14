@@ -40,6 +40,7 @@ except ImportError:  # pragma: no cover - depends on local environment
 COMMON_BAUD_RATES = [4800, 9600, 19200, 38400, 57600, 115200]
 DEFAULT_FILTER_TYPES = ["ZDA", "MWD", "MDA", "GGA"]
 PERMITTED_AGGREGATE_TYPES = ("MWD", "MDA", "GGA")
+DEFAULT_MAX_ZDA_SEEK = 5
 RAW_SENTENCE_PATTERN = re.compile(r"\$[^$\r\n]*\*[0-9A-Fa-f]{2}")
 PREFERRED_DEVICE_NAMES = [
     "/dev/serial0",
@@ -76,7 +77,7 @@ class FileStream(InputStream):
     def __init__(self, path: str) -> None:
         self.path = path
         self.source_name = path
-        self.handle = open(path, "r", encoding="utf-8")
+        self.handle = open(path, "r", encoding="utf-8", errors="ignore")
 
     def __next__(self) -> str:
         line = self.handle.readline()
@@ -373,6 +374,30 @@ def build_aggregated_buffer(
     return sentences
 
 
+def requested_aggregate_types(filter_types: set[str]) -> list[str]:
+    return [
+        sentence_type
+        for sentence_type in PERMITTED_AGGREGATE_TYPES
+        if sentence_type in filter_types
+    ]
+
+
+def has_met_sample_targets(
+    sample_counts: dict[str, int],
+    filter_types: set[str],
+    samples_per_type: int,
+) -> bool:
+    if samples_per_type <= 0:
+        return False
+    aggregate_types = requested_aggregate_types(filter_types)
+    if not aggregate_types:
+        return True
+    return all(
+        sample_counts.get(sentence_type, 0) >= samples_per_type
+        for sentence_type in aggregate_types
+    )
+
+
 def emit_buffer(
     args: argparse.Namespace,
     buffer: list[NMEASentence | str],
@@ -412,7 +437,7 @@ def emit_buffer(
 
 def process_stream(stream: InputStream, args: argparse.Namespace) -> None:
     reader = SentenceReader(stream)
-    if args.aggregation > 0:
+    if args.samples_per_type > 0:
         process_aggregated_stream(reader, args)
         return
 
@@ -452,7 +477,8 @@ def process_aggregated_stream(reader: SentenceReader, args: argparse.Namespace) 
     interval_start_zda = read_until_first_zda(reader)
     output_zda = interval_start_zda
     current_frame = FrameAggregator()
-    completed_intervals = 0
+    sample_counts = {sentence_type: 0 for sentence_type in requested_aggregate_types(args.filter)}
+    zda_seek_count = 0
 
     while True:
         new_sentence = reader.next_valid_sentence()
@@ -470,6 +496,9 @@ def process_aggregated_stream(reader: SentenceReader, args: argparse.Namespace) 
                 current_frame.add_sentence(new_sentence)
             except NMEAError:
                 pass
+            else:
+                if new_sentence.sentence_type in sample_counts:
+                    sample_counts[new_sentence.sentence_type] += 1
             continue
 
         if new_sentence.sentence_type != "ZDA":
@@ -480,8 +509,11 @@ def process_aggregated_stream(reader: SentenceReader, args: argparse.Namespace) 
         except NMEAError:
             continue
 
-        completed_intervals += 1
-        if completed_intervals >= args.aggregation:
+        zda_seek_count += 1
+        if (
+            has_met_sample_targets(sample_counts, args.filter, args.samples_per_type)
+            or zda_seek_count >= args.max_zda_seek
+        ):
             buffer = build_aggregated_buffer(
                 output_zda,
                 current_frame,
@@ -491,7 +523,11 @@ def process_aggregated_stream(reader: SentenceReader, args: argparse.Namespace) 
             interval_start_zda = new_sentence
             output_zda = new_sentence
             current_frame = FrameAggregator()
-            completed_intervals = 0
+            sample_counts = {
+                sentence_type: 0
+                for sentence_type in requested_aggregate_types(args.filter)
+            }
+            zda_seek_count = 0
             continue
 
         output_zda = new_sentence
@@ -549,11 +585,19 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Filename prefix for filtered NMEA output in data folder",
     )
     parser.add_argument(
-        "-g",
-        "--aggregation",
+        "-s",
+        "--samples-per-type",
+        dest="samples_per_type",
         type=int,
         default=1,
-        help="Number of valid ZDA intervals to aggregate over before emitting (default: 1; use 0 to disable)",
+        help="Target number of valid samples to collect for each requested secondary type before emitting (default: 1; use 0 to disable aggregation)",
+    )
+    parser.add_argument(
+        "-x",
+        "--max-zda-seek",
+        type=int,
+        default=DEFAULT_MAX_ZDA_SEEK,
+        help=f"Maximum number of valid ZDA boundaries to wait before emitting a partial aggregate (default: {DEFAULT_MAX_ZDA_SEEK})",
     )
     parser.add_argument(
         "-a",
@@ -585,16 +629,18 @@ def validate_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace
         parser.error("--data requires --prefix")
     if args.data_prefix and not re.fullmatch(r"[A-Za-z0-9]+", args.data_prefix):
         parser.error("--prefix may contain only letters and numbers")
-    if args.aggregation < 0:
-        parser.error("--aggregation must be greater than or equal to zero")
+    if args.samples_per_type < 0:
+        parser.error("--samples-per-type must be greater than or equal to zero")
+    if args.max_zda_seek < 1:
+        parser.error("--max-zda-seek must be greater than or equal to one")
     if args.auth_key is not None and len(args.auth_key) < 8:
         parser.error("--auth must be at least 8 characters long")
-    if args.aggregation > 0:
+    if args.samples_per_type > 0:
         permitted_filter_types = {"ZDA", *PERMITTED_AGGREGATE_TYPES}
         unsupported_types = sorted(args.filter - permitted_filter_types)
         if unsupported_types:
             parser.error(
-                "--aggregation is only supported when --filter contains ZDA "
+                "--samples-per-type aggregation is only supported when --filter contains ZDA "
                 f"and these aggregate types: {','.join(PERMITTED_AGGREGATE_TYPES)}; "
                 f"unsupported type(s): {','.join(unsupported_types)}"
             )
