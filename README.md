@@ -82,18 +82,23 @@ Authorization notes:
 
 ### use Raspberry PI imager to create headless OS
 * 4Gb/16Gb+
-* enable RP Connect so we can connect remotely
+** note the name and version of the (headless) OS
+*** Be sure to name the OS whenever doing any Gemini/ChatGPT queries to get the right commands!
+** enable RP Connect so we can connect remotely
+** create the admin user as "pi" (and write down the passwd somewhere!)
+* After you're up and running, run sudo apt update / upgrade
 
 ### check standard installation
 * `python3 --version` # Python `3.13.5`
 * `sudo apt install python3-pip`
-* `sudo nmtui` # determine IP address eg. `192.168.1.10`, setup wifi etc
+* `sudo nmtui` # use netmanager to setup a fixed (non-dchp) address for pi on club network
 * You might also want to install CUPS/SAMBA to enable AirPrint
 
 ### Install and open firewall
 * `sudo apt install ufw -y`
 * `sudo ufw allow ssh`
 * `sudo ufw allow http`
+* `sudo ufw allow 631/tcp`
 * `sudo ufw allow 8080/tcp`
 * `sudo ufw enable`
 * `sudo ufw status verbose`
@@ -128,6 +133,10 @@ server {
 
 ### Create and prepare code directory
 * `sudo mkdir /var/www/python/nmea`
+* Ensure your user can access the files and the service group can access them too
+** sudo chown -R pi:www-data /var/www/python/nmea
+** sudo chmod -R 775 /var/www/python/nmea
+** sudo chmod g+s /var/www/python/nmea
 * `cd /var/www/python/nmea`
 * `sudo scp *.py *.html requirements.txt .`
 * `python3 -m venv venv`
@@ -139,12 +148,12 @@ server {
 ### Test nmea_repository.py
 * `source venv/bin/activate`
 * `gunicorn --bind 0.0.0.0:8000 nmea_repository:app`
-* `http://192.168.1.10:8080/nmea/count`
+* `curl http://127.0.0.1:8080/nmea/count` => 0
 * `deactivate`
 
 ### Test nmea_filter.py
 * `source venv/bin/activate`
-* `python3 nmea_filter.py -u http://127.0.0.1:8080/nmea/add/WSC/Barge -a MyApiKey -s 1 -x 5`
+* `python3 nmea_filter.py -u http://127.0.0.1:8080/nmea/add/WSC/Barge -a MyApiKey -s 3 -x 10`
 * `deactivate`
 
 ### Create nmea_repository.service
@@ -155,7 +164,7 @@ Description=Gunicorn instance to serve the nmea_repository App
 After=network.target
 
 [Service]
-User=russel
+User=pi
 Group=www-data
 WorkingDirectory=/var/www/python/nmea
 # Path to the Gunicorn executable inside your virtual environment
@@ -174,17 +183,17 @@ WantedBy=multi-user.target
 * `sudo nano /etc/systemd/system/nmea_filter.service`
 ```text
 [Unit]
-Description=Service to run nmea_filter pythong script
+Description=Service to run nmea_filter python script
 After=multi-user.target
 
 [Service]
 # Run as specific user (usually 'pi')
-User=russel
+User=pi
 
 # Set working directory so relative paths in your script work
 WorkingDirectory=/var/www/python/nmea
 # Use full paths for the Python interpreter and your script
-ExecStart=/usr/bin/python3 /var/www/python/nmea/nmea_filter.py @/var/www/python/nmea/nmea_filter.txt
+ExecStart=/var/www/python/nmea/venv/bin/python3 /var/www/python/nmea/nmea_filter.py @/var/www/python/nmea/nmea_filter.txt
 # Automatically restart if the script crashes
 Restart=always
 
@@ -195,22 +204,75 @@ WantedBy=multi-user.target
 ```text
 -u http://127.0.0.1:8080/nmea/add/WSC/Barge
 -a MyApiKey
--s 1
--x 5
+-s 3
+-x 10
 ```
 * `sudo systemctl daemon-reload`
 * `sudo systemctl start nmea_filter.service`
 * `sudo systemctl enable nmea_filter.service`
 
+### Install Cloudfare tunnel
+* Use the "zero trust" panel in cloudflare to create `wscpi.arcsite.ca` tunnel
+
+### Create Kiosk
+* sudo adduser kiosk (Write down the passwd somewhere!)
+* sudo apt install -y --no-install-recommends xserver-xorg xinit x11-xserver-utils openbox chromium lightdm unclutter
+* sudo raspi-config => 1 System Options > S5 Boot / Auto Login > Select B4 Desktop Autologin
+** sudo nano /etc/lightdm/lightdm.conf
+** autologin-user=kiosk
+** autologin-user-timeout=0
+** allow-guest=false
+* sudo systemctl set-default graphical.target
+* sudo su - kiosk
+** mkdir -p ~/.config/openbox
+** nano ~/.config/openbox/autostart
+```
+# Disable X11 screen savers and power blanking monitors
+# xset s off
+# xset s noblank
+# xset -dpms
+
+# Hide the mouse cursor after 1 second of inactivity
+unclutter -idle 1 -root &
+
+# Block Chromium crash-warning error notifications on power-loss
+sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences
+sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/Default/Preferences
+
+# Launch Chromium in an unclosable full-screen loop using your URL
+while true; do
+  chromium --kiosk --noerrdialogs --disable-infobars --check-for-update-interval=31536000 "https://wscpi.arcsite.ca/nmea-frame.html?org=WSC&src=Barge"
+  sleep 5
+done
+```
+** exit
+* sudo reboot
+
+## Add keyboard breakout mode for Kiosk (optional)
+* sudo su - kiosk
+* mkdir -p ~/.config/openbox
+* cp /etc/xdg/openbox/rc.xml ~/.config/openbox/rc.xml
+* nano ~/.config/openbox/rc.xml
+** Just above </keyboard>, add the following:
+```
+  <!-- Custom Emergency Kiosk Exit Shortcut -->
+  <keybind key="C-A-x">
+    <action name="Execute">
+      <command>pkill -f chromium</command>
+    </action>
+    <action name="Exit"/>
+  </keybind>
+```
+* Ctrl-Alt-x to break from Chromium
+* Ctrl-Alt-F2 to switch to terminal
+
+
 ### Troubleshooting Services
 * Ensure the following user/group ownership and permissions to allow service to access
 ** `drwxr-xr-x 12 root   root     4096 Apr 23 18:46 /var`
 ** `drwxr-xr-x 4  root   root     4096 Apr 24 12:50 /var/www`
-** `drwxr-xr-x 4  russel www-data 4096 Apr 23 20:32 /var/www/python`
+** `drwxr-xr-x 4  pi     www-data 4096 Apr 23 20:32 /var/www/python`
 * if there are errors,
 ** `sudo systemctl status nmea_repository.service`
 ** `journalctl -u nmea_repository | tail`
 ** `sudo ss -tulpn | grep :8000`
-
-### Install Cloudfare tunnel
-* Use the "zero trust" panel in cloudflare to create `wsc.arcsite.ca` tunnel
