@@ -652,8 +652,8 @@
       setStatus("Add ?org=<org>&src=<source> to the page URL.", true);
       elements.subheading.textContent = "Query string required";
     } else {
-      elements.heading.textContent = `Polar Wind at ${requestConfig.org} ${requestConfig.source}`;
-      elements.subheading.textContent = `${requestConfig.span} window`;
+      elements.heading.textContent = `Wind at ${requestConfig.org} ${requestConfig.source}`;
+      elements.subheading.textContent = "Loading...";
       refreshHistory();
       setInterval(refreshHistory, requestConfig.refreshIntervalMs);
     }
@@ -686,10 +686,10 @@
     }
 
     function renderHistory(history, samples) {
-      const title = `Polar Wind at ${displayValue(history.org)} ${displayValue(history.source)}`;
+      const title = `Wind at ${displayValue(history.org)} ${displayValue(history.source)}`;
       document.title = title;
       elements.heading.textContent = title;
-      elements.subheading.textContent = describeWindow(history, samples, history.span || requestConfig.span);
+      elements.subheading.textContent = describeWindow(history, samples);
       renderAnalysis(history.analysis || {});
 
       const meanDirection = measurementValue(history.analysis?.wind?.mean?.direction);
@@ -704,10 +704,10 @@
       const pressure = analysis.pressure || {};
       const temperature = analysis.temperature || {};
 
-      elements.meanWind.textContent = displayValue(wind.mean?.headline);
-      elements.meanWindDetail.textContent = displayValue(wind.mean?.detail);
-      elements.currentWind.textContent = displayValue(wind.current?.headline);
-      elements.currentWindDetail.textContent = displayValue(wind.current?.detail);
+      elements.meanWind.textContent = windTextWithoutDirection(wind.mean, "headline");
+      elements.meanWindDetail.textContent = windTextWithoutDirection(wind.mean, "detail");
+      elements.currentWind.textContent = windTextWithoutDirection(wind.current, "headline");
+      elements.currentWindDetail.textContent = windTextWithoutDirection(wind.current, "detail");
       applyWindHighlight(elements.meanWindCard, wind.mean, elements.meanWindArrow, elements.meanWindArrowLabel);
       applyWindHighlight(elements.currentWindCard, wind.current, elements.currentWindArrow, elements.currentWindArrowLabel);
       elements.oscillation.textContent = displayValue(wind.analysis?.headline);
@@ -754,6 +754,26 @@
         arrowLabel.style.removeProperty("--wind-direction-label-color");
         arrowLabel.textContent = "-";
       }
+    }
+
+    function windTextWithoutDirection(analysis, fieldName) {
+      const text = displayValue(analysis?.[fieldName]);
+      const direction = measurementValue(analysis?.direction);
+      const symbol = typeof analysis?.direction?.symbol === "string" ? analysis.direction.symbol : directionToCompass(direction);
+      return stripWindDirectionSymbol(text, symbol);
+    }
+
+    function stripWindDirectionSymbol(text, symbol) {
+      if (!symbol || text === "-") {
+        return text;
+      }
+
+      const escapedSymbol = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return text
+        .replace(new RegExp(`\\s+${escapedSymbol}$`, "i"), "")
+        .replace(new RegExp(`^${escapedSymbol}\\s+`, "i"), "")
+        .replace(/^\(([^()]+)\)$/, "$1")
+        .trim() || text;
     }
 
     function applyMetricHighlight(card, measurement, range, converter) {
@@ -1097,11 +1117,10 @@
       return 15;
     }
 
-    function describeWindow(history, samples, span) {
+    function describeWindow(history, samples) {
       const startValue = history.oldest_utc_time || samples[0].time;
       const endValue = history.latest_utc_time || samples[samples.length - 1].time;
-      const prefix = span ? `${formatSpanLabel(span)} window` : `${samples.length} samples`;
-      return `${prefix} | ${formatLocalClockTime(startValue)} to ${formatLocalClockTime(endValue)} local (${formatLocalIsoDate(endValue)})`;
+      return `${formatLocalClockTime(startValue)} to ${formatLocalClockTime(endValue)} (${formatLocalDisplayDate(endValue)})`;
     }
 
     function formatDegreesLabel(value) {
@@ -1141,24 +1160,17 @@
       return formatter.format(date).replace(" AM", " a.m.").replace(" PM", " p.m.");
     }
 
-    function formatLocalIsoDate(value) {
+    function formatLocalDisplayDate(value) {
       const date = value instanceof Date ? value : new Date(value);
       if (Number.isNaN(date.getTime())) {
         return "-";
       }
 
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }
-
-    function formatSpanLabel(span) {
-      return String(span)
-        .replaceAll("-", " ")
-        .replace(/\bminutes\b/i, "minute")
-        .replace(/\bhours\b/i, "hour")
-        .replace(/\bdays\b/i, "day");
+      return new Intl.DateTimeFormat("en-CA", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(date);
     }
 
     function normalizeDegrees(value) {
