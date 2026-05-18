@@ -233,13 +233,12 @@ WantedBy=multi-user.target
 # xset -dpms
 
 # Force 270-degree monitor orientation layout (rotate left)
-xrandr --output HDMI-1 --rotate left
+# xrandr --output HDMI-1 --rotate left
 
-echo "Waiting for Cloudflare Tunnel network backbone..."
-until curl -sI https://wsc.arcsite.ca | grep -q "HTTP/"; do
-  sleep 2
-done
-echo "Network connection established! Launching viewport..."
+# echo "Waiting for Cloudflare Tunnel network backbone..."
+# until curl -sI https://wsc.arcsite.ca | grep -q "HTTP/"; do
+#   sleep 2
+# done
 
 # Hide the mouse cursor after 1 second of inactivity
 unclutter -idle 1 -root &
@@ -250,7 +249,7 @@ sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' ~/.config/chromium/Defa
 
 # Launch Chromium in an unclosable full-screen loop using your URL
 while true; do
-  chromium --kiosk --noerrdialogs --disable-infobars --check-for-update-interval=31536000 "https://wsc.arcsite.ca/nmea-frame.html?org=WSC&src=Barge"
+  chromium --kiosk --noerrdialogs --disable-infobars --check-for-update-interval=31536000 "http://localhost"8080/nmea-frame.html?org=WSC&src=Barge"
   sleep 5
 done
 ```

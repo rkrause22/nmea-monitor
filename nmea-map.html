@@ -194,6 +194,8 @@
     let infoWindow;
     const requestConfig = readRequestConfig();
     let mapsApiLoadStarted = false;
+    let lastWeatherPosition = null;
+    let lastWindDirection = null;
 
     if (!requestConfig.org || !requestConfig.source) {
       document.title = "Weather Map";
@@ -277,7 +279,7 @@
       if (!response.ok) {
         throw new Error(`Weather request failed: HTTP ${response.status}`);
       }
-      return response.json();
+      return weatherWithLastKnownValues(await response.json());
     }
 
     async function loadMapsApiForOrg() {
@@ -361,6 +363,52 @@
         throw new Error("Weather response does not contain a valid latitude/longitude.");
       }
       return { lat, lng };
+    }
+
+    function weatherWithLastKnownValues(weather) {
+      const restoredWeather = weather && typeof weather === "object" ? { ...weather } : {};
+
+      if (!hasWeatherPosition(restoredWeather) && lastWeatherPosition) {
+        restoredWeather.latitude = lastWeatherPosition.lat;
+        restoredWeather.longitude = lastWeatherPosition.lng;
+      }
+
+      if (!hasWindDirection(restoredWeather.wind_direction) && lastWindDirection !== null) {
+        restoredWeather.wind_direction = cloneWeatherValue(lastWindDirection);
+      }
+
+      if (hasWeatherPosition(restoredWeather)) {
+        lastWeatherPosition = {
+          lat: Number(restoredWeather.latitude),
+          lng: Number(restoredWeather.longitude),
+        };
+      }
+
+      if (hasWindDirection(restoredWeather.wind_direction)) {
+        lastWindDirection = cloneWeatherValue(restoredWeather.wind_direction);
+      }
+
+      return restoredWeather;
+    }
+
+    function hasWeatherPosition(weather) {
+      if (!weather || typeof weather !== "object") {
+        return false;
+      }
+
+      return Number.isFinite(Number(weather.latitude)) && Number.isFinite(Number(weather.longitude));
+    }
+
+    function hasWindDirection(measurement) {
+      return Number.isFinite(Number(windDirectionValue(measurement)));
+    }
+
+    function cloneWeatherValue(value) {
+      if (!value || typeof value !== "object") {
+        return value;
+      }
+
+      return JSON.parse(JSON.stringify(value));
     }
 
     function applyDefaultView(position) {
@@ -508,16 +556,24 @@
     }
 
     function directionDegrees(measurement) {
-      if (!measurement || typeof measurement !== "object") {
-        return 0;
-      }
-
-      const value = Number(firstValue(measurement.value, measurement.val, measurement.amount));
+      const value = Number(windDirectionValue(measurement));
       if (!Number.isFinite(value)) {
         return 0;
       }
 
       return value;
+    }
+
+    function windDirectionValue(measurement) {
+      if (measurement === null || measurement === undefined || measurement === "") {
+        return null;
+      }
+
+      if (typeof measurement !== "object") {
+        return measurement;
+      }
+
+      return firstValue(measurement.value, measurement.val, measurement.amount);
     }
 
     function reverseDirectionDegrees(measurement) {
