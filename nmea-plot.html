@@ -597,7 +597,6 @@
   <script>
     const DEFAULT_SPAN = "30-minutes";
     const REFRESH_INTERVAL_MS = 60000;
-    const DISPLAY_CENTER_ANGLE = 0;
     const RANGE_STEP_DEGREES = 5;
     const RANGE_PADDING_DEGREES = 5;
     const WIND_HIGHLIGHT_RANGE_KN = { minimum: 0, maximum: 64 };
@@ -932,8 +931,8 @@
       const startOffset = -range.negative;
       const endOffset = range.positive;
       const sectorSpan = endOffset - startOffset;
-      const startAngle = DISPLAY_CENTER_ANGLE + startOffset;
-      const endAngle = DISPLAY_CENTER_ANGLE + endOffset;
+      const startAngle = meanDirection + startOffset;
+      const endAngle = meanDirection + endOffset;
       const angleStep = chooseAngleStep(sectorSpan);
       const boundaryOffsets = buildOffsetTicks(startOffset, endOffset, angleStep);
       const radialTicks = buildRadialTicks(samples[0].time, samples[samples.length - 1].time, 6);
@@ -951,7 +950,7 @@
         return polarPoint(
           centerX,
           centerY,
-          DISPLAY_CENTER_ANGLE + signedAngleDifference(sample.direction, meanDirection),
+          sample.direction,
           radius,
         );
       });
@@ -962,7 +961,7 @@
         return polarPoint(
           centerX,
           centerY,
-          DISPLAY_CENTER_ANGLE + signedAngleDifference(rollingDirection, meanDirection),
+          rollingDirection,
           radius,
         );
       });
@@ -974,11 +973,10 @@
       }).join("");
 
       const angleGrid = boundaryOffsets.map((offset) => {
-        const displayAngle = DISPLAY_CENTER_ANGLE + offset;
         const actualAngle = normalizeDegrees(meanDirection + offset);
-        const inner = polarPoint(centerX, centerY, displayAngle, innerRadius - 6);
-        const outer = polarPoint(centerX, centerY, displayAngle, outerRadius);
-        const labelPoint = polarPoint(centerX, centerY, displayAngle, outerRadius + 34);
+        const inner = polarPoint(centerX, centerY, actualAngle, innerRadius - 6);
+        const outer = polarPoint(centerX, centerY, actualAngle, outerRadius);
+        const labelPoint = polarPoint(centerX, centerY, actualAngle, outerRadius + 34);
         return `
           <line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" stroke="var(--plot-grid)" stroke-width="1.1" />
           <text x="${labelPoint.x}" y="${labelPoint.y}" fill="var(--text)" font-size="18" font-weight="700" text-anchor="middle">${escapeHtml(formatDegreesLabel(actualAngle))}</text>
@@ -997,8 +995,8 @@
         <path d="${wedgePath(centerX, centerY, innerRadius, outerRadius, startAngle, endAngle)}" fill="var(--plot-shell)" stroke="var(--plot-shell-stroke)" stroke-width="2" />
       `;
 
-      const meanOuter = polarPoint(centerX, centerY, DISPLAY_CENTER_ANGLE, outerRadius);
-      const meanInner = polarPoint(centerX, centerY, DISPLAY_CENTER_ANGLE, innerRadius - 10);
+      const meanOuter = polarPoint(centerX, centerY, meanDirection, outerRadius);
+      const meanInner = polarPoint(centerX, centerY, meanDirection, innerRadius - 10);
       const latestAverage = averagePoints[averagePoints.length - 1];
       const latestSample = samplePoints[samplePoints.length - 1];
 
