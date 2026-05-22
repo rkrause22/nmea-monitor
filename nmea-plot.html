@@ -940,10 +940,14 @@
       const height = 980;
       const viewBoxTop = 190;
       const viewBoxHeight = 760;
-      const centerX = 520;
-      const centerY = 920;
       const innerRadius = 70;
       const outerRadius = 640;
+      const visibleCenterX = width / 2;
+      const visibleCenterY = viewBoxTop + viewBoxHeight / 2;
+      const rootOffsetRadius = (innerRadius + outerRadius) / 2;
+      const plotRoot = polarPoint(visibleCenterX, visibleCenterY, meanDirection + 180, rootOffsetRadius);
+      const centerX = plotRoot.x;
+      const centerY = plotRoot.y;
 
       const samplePoints = samples.map((sample) => {
         const radius = innerRadius + ((sample.time.getTime() - earliestTime) / duration) * (outerRadius - innerRadius);
