@@ -52,13 +52,11 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
 
         try:
             record = message_record_from_payload(payload)
-            created = service.add_message(auth, org, source, record)
+            service.add_message(auth, org, source, record)
         except ValueError as exc:
             return handle_value_error("invalid add payload", exc, add_missing_registration=True)
 
-        return jsonify({"status": "created" if created else "updated"}), (
-            201 if created else 200
-        )
+        return jsonify({"status": "created"}), 201
 
     @app.post("/nmea/registrations")
     def register_org() -> tuple[Response, int]:

@@ -50,22 +50,17 @@ class FileStore(RepositoryStore):
         folder.mkdir(parents=True, exist_ok=True)
 
         target_path = self._nmea_path(org, source, record.utc.date())
-        existing_records = self._records_for_day(org, source, record.utc.date())
-        created = record.utc not in {existing.utc for existing in existing_records}
 
         if not target_path.exists():
             self._compress_stale_nmea_files(org, source, keep_date=record.utc.date())
             self.purge_stale_data(org, source, None)
 
-        by_utc = {existing.utc: existing for existing in existing_records}
-        by_utc[record.utc] = record
-        records_to_write = [by_utc[utc] for utc in sorted(by_utc)]
-        self._write_records(target_path, records_to_write)
+        self._append_record(target_path, record)
 
         gzip_path = self._gzip_path(org, source, record.utc.date())
         if gzip_path.exists():
             gzip_path.unlink()
-        return created
+        return True
 
     def find_messages(
         self,
@@ -450,30 +445,18 @@ class FileStore(RepositoryStore):
                     sentences=sentences,
                 )
 
-    def _records_for_day(
-        self,
-        org: str,
-        source: str,
-        day: date,
-    ) -> list[MessageRecord]:
-        available_path = self._available_days(org, source).get(day)
-        if available_path is None:
-            return []
-        return list(self._read_records(available_path))
-
-    def _write_records(
+    def _append_record(
         self,
         path: Path,
-        records: list[MessageRecord],
+        record: MessageRecord,
     ) -> None:
-        with path.open("w", encoding="utf-8", newline="\n") as handle:
-            for record in records:
-                payload = {
-                    "utc": format_utc_datetime(record.utc),
-                    "sentences": record.sentences,
-                }
-                json.dump(payload, handle, ensure_ascii=True, separators=(",", ":"))
-                handle.write("\n")
+        payload = {
+            "utc": format_utc_datetime(record.utc),
+            "sentences": record.sentences,
+        }
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=True, separators=(",", ":"))
+            handle.write("\n")
 
     def get_registration(self, org: str) -> RegistrationRecord | None:
         registrations = self._load_registrations()

@@ -32,7 +32,7 @@ Storage layout:
 Endpoints:
 
 * `POST /nmea/add/<org>/<source>`
-  Accepts a JSON body containing `start` and `sentences`, and creates or updates the stored message for that `org/source/start` time. Requires a bearer token matching the organization registration.
+  Accepts a JSON body containing `start` and `sentences`, and appends the stored message for that `org/source` stream. Requires a bearer token matching the organization registration.
 * `POST /nmea/registrations`
   Creates a new organization registration with its authentication token and retention settings. Creating the first `admin` registration is a bootstrap case; later registrations require the admin bearer token.
 * `GET /nmea/registrations`
