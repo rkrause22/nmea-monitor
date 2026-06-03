@@ -106,6 +106,20 @@ class SerialStream(InputStream):
         self.connection.close()
 
 
+class DumpingStream(InputStream):
+    def __init__(self, inner: InputStream) -> None:
+        self.inner = inner
+        self.source_name = inner.source_name
+
+    def __next__(self) -> str:
+        raw = next(self.inner)
+        print(raw, end="", file=sys.stderr, flush=True)
+        return raw
+
+    def close(self) -> None:
+        self.inner.close()
+
+
 class SentenceReader:
     def __init__(self, stream: InputStream) -> None:
         self.stream = stream
@@ -621,6 +635,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show filtered NMEA output on stdout",
     )
+    parser.add_argument(
+        "--dump",
+        action="store_true",
+        help="Dump raw inbound text to stderr before sentence parsing",
+    )
     return parser
 
 
@@ -655,6 +674,9 @@ def run_once(args: argparse.Namespace) -> None:
             stream = wait_for_valid_nmea_on_port(args.port, args.baud)
         else:
             stream = scan_for_nmea_stream(args.scan_timeout)
+
+        if args.dump:
+            stream = DumpingStream(stream)
 
         process_stream(stream, args)
     finally:
