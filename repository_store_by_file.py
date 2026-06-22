@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from common_helpers import datesub, format_utc_datetime, parse_timespan, parse_utc_datetime
-from repository_store import MessageRecord, RegistrationRecord, RepositoryStore
+from repository_store import MessageRecord, RegistrationRecord, RepairResult, RepositoryStore
 
 
 NMEA_SUFFIX = ".nmea.jsonl"
@@ -156,6 +156,64 @@ class FileStore(RepositoryStore):
             path.unlink()
             deleted += 1
         return deleted
+
+    def fix_message_file(
+        self,
+        org: str,
+        source: str,
+        day: date | None = None,
+    ) -> RepairResult:
+        org = self._normalize_org_name(org)
+        source = self._normalize_source_name(source)
+        target_day = day or self._now_factory().date()
+        plain_path = self._nmea_path(org, source, target_day)
+        gzip_path = self._gzip_path(org, source, target_day)
+
+        source_path: Path | None = None
+        was_gzipped = False
+        if plain_path.exists():
+            source_path = plain_path
+        elif gzip_path.exists():
+            source_path = gzip_path
+            was_gzipped = True
+        if source_path is None:
+            raise ValueError("message file not found")
+
+        opener = gzip.open if was_gzipped else open
+        valid_lines: list[str] = []
+        corrupt_rows: list[str] = []
+        with opener(source_path, "rt", encoding="utf-8") as handle:
+            for raw_line in handle:
+                line = raw_line.rstrip("\r\n")
+                if not line.strip():
+                    corrupt_rows.append(line)
+                    continue
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    corrupt_rows.append(line)
+                    continue
+                record = self._message_record_from_storage_payload(payload)
+                if record is None:
+                    corrupt_rows.append(line)
+                    continue
+                valid_lines.append(self._record_to_jsonl_line(record))
+
+        self._write_fixed_lines(plain_path, valid_lines)
+
+        if target_day == self._now_factory().date():
+            if gzip_path.exists():
+                gzip_path.unlink()
+        else:
+            self._compress_plain_file(plain_path, gzip_path)
+
+        return RepairResult(
+            org=org,
+            source=source,
+            day=target_day,
+            removed_count=len(corrupt_rows),
+            corrupt_rows=corrupt_rows,
+        )
 
     # Registration operations
     def add_registration(
@@ -302,10 +360,7 @@ class FileStore(RepositoryStore):
             if day is None or day == keep_date:
                 continue
             gzip_path = self._gzip_path(org, source, day)
-            with nmea_path.open("rb") as source_handle:
-                with gzip.open(gzip_path, "wb") as target_handle:
-                    target_handle.writelines(source_handle)
-            nmea_path.unlink()
+            self._compress_plain_file(nmea_path, gzip_path)
 
     def _iter_candidate_paths(
         self,
@@ -428,35 +483,63 @@ class FileStore(RepositoryStore):
                 text = line.strip()
                 if not text:
                     continue
-                payload = json.loads(text)
-                if not isinstance(payload, dict):
+                try:
+                    payload = json.loads(text)
+                except json.JSONDecodeError:
                     continue
-                utc_value = payload.get("utc")
-                sentences_value = payload.get("sentences")
-                if not isinstance(utc_value, str):
-                    continue
-                if not isinstance(sentences_value, list):
-                    continue
-                sentences = [item for item in sentences_value if isinstance(item, str)]
-                if len(sentences) != len(sentences_value):
-                    continue
-                yield MessageRecord(
-                    utc=parse_utc_datetime(utc_value),
-                    sentences=sentences,
-                )
+                record = self._message_record_from_storage_payload(payload)
+                if record is not None:
+                    yield record
 
     def _append_record(
         self,
         path: Path,
         record: MessageRecord,
     ) -> None:
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(self._record_to_jsonl_line(record))
+            handle.write("\n")
+
+    def _record_to_jsonl_line(self, record: MessageRecord) -> str:
         payload = {
             "utc": format_utc_datetime(record.utc),
             "sentences": record.sentences,
         }
-        with path.open("a", encoding="utf-8", newline="\n") as handle:
-            json.dump(payload, handle, ensure_ascii=True, separators=(",", ":"))
-            handle.write("\n")
+        return json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+
+    def _message_record_from_storage_payload(
+        self,
+        payload: object,
+    ) -> MessageRecord | None:
+        if not isinstance(payload, dict):
+            return None
+        utc_value = payload.get("utc")
+        sentences_value = payload.get("sentences")
+        if not isinstance(utc_value, str):
+            return None
+        if not isinstance(sentences_value, list):
+            return None
+        sentences = [item for item in sentences_value if isinstance(item, str)]
+        if len(sentences) != len(sentences_value):
+            return None
+        try:
+            utc = parse_utc_datetime(utc_value)
+        except ValueError:
+            return None
+        return MessageRecord(utc=utc, sentences=sentences)
+
+    def _write_fixed_lines(self, path: Path, lines: list[str]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            for line in lines:
+                handle.write(line)
+                handle.write("\n")
+
+    def _compress_plain_file(self, plain_path: Path, gzip_path: Path) -> None:
+        with plain_path.open("rb") as source_handle:
+            with gzip.open(gzip_path, "wb") as target_handle:
+                target_handle.writelines(source_handle)
+        plain_path.unlink()
 
     def get_registration(self, org: str) -> RegistrationRecord | None:
         registrations = self._load_registrations()

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date, datetime, timezone
 from functools import partial
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 from common_helpers import (
     apply_date_filters,
     log_exception as write_log_exception,
+    parse_utc_date,
     parse_timespan,
     parse_utc_datetime,
 )
@@ -158,6 +160,38 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
 
         return jsonify({"status": "deleted", "files_deleted": deleted_files}), 200
 
+    @app.post("/nmea/fix/<org>/<source>")
+    @app.post("/nmea/fix/<org>/<source>/<day_text>")
+    def fix_nmea_messages(
+        org: str,
+        source: str,
+        day_text: str | None = None,
+    ) -> tuple[Response, int]:
+        try:
+            auth = require_bearer_token(request)
+        except ValueError as exc:
+            return handle_value_error("invalid fix authorization", exc)
+
+        try:
+            target_day = resolve_message_day(day_text)
+            result = service.fix_message_file(auth, org, source, target_day)
+        except ValueError as exc:
+            return handle_value_error("invalid fix request", exc, add_missing_registration=True)
+
+        return (
+            jsonify(
+                {
+                    "status": "fixed",
+                    "org": result.org,
+                    "source": result.source,
+                    "date": result.day.isoformat(),
+                    "removed_count": result.removed_count,
+                    "corrupt_rows": result.corrupt_rows,
+                }
+            ),
+            200,
+        )
+
     @app.get("/nmea/last/<org>/<source>")
     @app.get("/nmea/last/<org>/<source>/<what>")
     def get_nmea_latest_messages(
@@ -264,6 +298,12 @@ def require_bearer_token(req) -> str:
     if scheme != "Bearer" or not token:
         raise ValueError("access denied")
     return token
+
+
+def resolve_message_day(day_text: str | None) -> date:
+    if day_text is None:
+        return datetime.now(timezone.utc).date()
+    return parse_utc_date(day_text)
 
 
 def message_record_from_payload(payload: dict[str, object]) -> MessageRecord:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from common_helpers import datesub
-from repository_store import MessageRecord, RegistrationRecord, RepositoryStore
+from repository_store import MessageRecord, RegistrationRecord, RepairResult, RepositoryStore
 
 
 class RepositoryService:
@@ -92,6 +92,16 @@ class RepositoryService:
     ) -> int:
         self._require_org_access(org, auth)
         return self.store.purge_stale_data(org, source, what)
+
+    def fix_message_file(
+        self,
+        auth: str,
+        org: str,
+        source: str,
+        day=None,
+    ) -> RepairResult:
+        self._require_org_access(org, auth)
+        return self.store.fix_message_file(org, source, day)
 
     # Registration operations
     def add_registration(

@@ -9,6 +9,7 @@ of carrying parallel shapes forever.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from datetime import datetime
 from typing import Protocol
 
@@ -30,6 +31,15 @@ class RegistrationRecord:
     span: str
     limit: int
     gkey: str = ""
+
+
+@dataclass(frozen=True)
+class RepairResult:
+    org: str
+    source: str
+    day: date
+    removed_count: int
+    corrupt_rows: list[str]
 
 
 class RepositoryStore(Protocol):
@@ -68,6 +78,14 @@ class RepositoryStore(Protocol):
         what: str | None = None,
     ) -> int:
         """Delete stale stored volume for one org/source and return the delete count."""
+
+    def fix_message_file(
+        self,
+        org: str,
+        source: str,
+        day: date | None = None,
+    ) -> RepairResult:
+        """Remove malformed JSONL rows from one day file and report the repair result."""
 
     # Registration operations
     def add_registration(

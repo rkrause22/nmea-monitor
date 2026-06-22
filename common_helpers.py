@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import traceback
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
@@ -34,6 +34,16 @@ def parse_utc_datetime(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def parse_utc_date(value: str) -> date:
+    text = value.strip()
+    if not text:
+        raise ValueError("date must not be empty")
+    try:
+        return date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError("date must use yyyy-mm-dd") from exc
 
 
 def parse_query_time_range(value: str) -> tuple[datetime, datetime]:

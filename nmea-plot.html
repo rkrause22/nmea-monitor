@@ -1372,6 +1372,12 @@
     function historyUrl(config) {
       const params = new URLSearchParams();
       params.set("span", config.span);
+      if (config.start) {
+        params.set("start", config.start);
+      }
+      if (config.end) {
+        params.set("end", config.end);
+      }
       return `/nmea/history/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}?${params.toString()}`;
     }
 
@@ -1379,11 +1385,15 @@
       const org = firstQueryValue("org");
       const source = firstQueryValue("src", "source");
       const span = firstQueryValue("span") || DEFAULT_SPAN;
+      const start = firstQueryValue("start");
+      const end = firstQueryValue("end");
 
       return {
         org,
         source,
         span,
+        start,
+        end,
         refreshIntervalMs: readRefreshIntervalMs(),
       };
     }
