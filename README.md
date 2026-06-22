@@ -58,7 +58,7 @@ Endpoints:
 * `GET /nmea/find/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
   Returns matching stored messages for the given `org/source`, optionally filtered by a date/time range and/or span. If no filter is supplied, it returns the latest message.
 * `GET /nmea/history/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
-  Returns plot-ready wind history for the given `org/source` as JSON, optionally filtered by a date/time range and/or span. When only `span` is supplied, the trailing window is anchored to the latest stored record rather than current wall-clock time, so somewhat stale feeds still return history. The response includes `org`, `source`, the supplied filter values, and a `samples` array ordered from oldest to newest.
+  Returns plot-ready wind history for the given `org/source` as JSON, optionally filtered by a date/time range and/or span. `start` with `span` creates a window beginning at `start`; `end` with `span` creates a window ending at `end`; and `span` alone creates a trailing window ending at the current time. When both `start` and `end` are supplied, `span` is ignored. The response includes `org`, `source`, the supplied filter values, and a `samples` array ordered from oldest to newest.
 * `GET /nmea/weather/<org>/<source>`
   Returns a weather-oriented summary view derived from the most recent stored message(s) for the `org/source`.
 * `GET /nmea/weather/<org>/<source>/<count>`

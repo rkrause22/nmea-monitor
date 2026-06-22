@@ -205,29 +205,34 @@ def apply_date_filters(
     end_text: str | None,
     span_text: str | None = None,
 ) -> tuple[datetime | None, datetime | None]:
-    start: datetime | None = None
-    end: datetime | None = None
+    start = parse_query_time_range(start_text)[0] if start_text is not None else None
+    end = parse_query_time_range(end_text)[1] if end_text is not None else None
 
-    if span_text is not None:
-        text = span_text.strip()
-        if not text:
-            raise ValueError("span must not be empty")
-        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
-        if text.lower() == "today":
-            start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        else:
-            start = datesub(now_utc, text)
+    if start is not None and end is not None:
+        return (end, end) if start >= end else (start, end)
 
-    if start_text is not None:
-        query_start, _ = parse_query_time_range(start_text)
-        start = query_start if start is None else max(start, query_start)
+    if span_text is None:
+        return start, end
 
-    if end_text is not None:
-        _, end = parse_query_time_range(end_text)
+    text = span_text.strip()
+    if not text:
+        raise ValueError("span must not be empty")
 
-    if start is not None and end is not None and start >= end:
-        return end, end
-    return start, end
+    if text.lower() == "today":
+        if start is not None or end is not None:
+            raise ValueError("span=today cannot be combined with start or end")
+        end = datetime.now(timezone.utc).replace(tzinfo=None)
+        start = end.replace(hour=0, minute=0, second=0, microsecond=0)
+        return start, end
+
+    span = parse_timespan(text)
+    if start is not None:
+        return start, start + span
+    if end is not None:
+        return end - span, end
+
+    end = datetime.now(timezone.utc).replace(tzinfo=None)
+    return end - span, end
 
 
 def vector_add(

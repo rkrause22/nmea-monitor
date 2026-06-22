@@ -253,11 +253,8 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
         span_text = request.args.get("span")
 
         try:
-            if start_text is None and end_text is None:
-                records = service.get_history(org, source, span=span_text)
-            else:
-                start, end = apply_date_filters(start_text, end_text, span_text)
-                records = service.get_history(org, source, start=start, end=end)
+            start, end = apply_date_filters(start_text, end_text, span_text)
+            records = service.get_history(org, source, start=start, end=end)
         except ValueError as exc:
             return handle_value_error("invalid history query parameters", exc)
 
