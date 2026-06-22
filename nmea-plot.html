@@ -21,7 +21,7 @@
       --plot-grid-soft: #c7d2da;
       --plot-shell: #ffffff;
       --plot-shell-stroke: #4f6574;
-      --sample-line: rgb(71 91 106 / 62%);
+      --sample-line: rgb(145 153 159 / 38%);
       --average-line: #147a37;
       --mean-line: #d22f27;
     }
@@ -1028,7 +1028,7 @@
             ${gridArcs}
             ${angleGrid}
             ${radialLabels}
-            <path d="${polylinePath(samplePoints)}" fill="none" stroke="var(--sample-line)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="${polylinePath(samplePoints)}" fill="none" stroke="var(--sample-line)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
             ${averageSegments}
             <line x1="${meanInner.x}" y1="${meanInner.y}" x2="${meanOuter.x}" y2="${meanOuter.y}" stroke="var(--mean-line)" stroke-width="4.5" stroke-linecap="round" />
             <circle cx="${latestAverage.x}" cy="${latestAverage.y}" r="7" fill="var(--mean-line)" />
