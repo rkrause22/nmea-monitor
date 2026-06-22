@@ -185,6 +185,7 @@
   <script>
     const REFRESH_INTERVAL_MS = 10000;
     const DEFAULT_VIEW_HEIGHT_METRES = 1000;
+    const BARGE_CLICK_RADIUS_METRES = 50;
     const PAGE_QUERY = new URLSearchParams(window.location.search);
 
     let map;
@@ -222,7 +223,7 @@
         infoWindow.addListener("closeclick", () => {
           isInfoWindowOpen = false;
         });
-        map.addListener("click", closeInfoWindow);
+        map.addListener("click", handleMapClick);
 
         renderWeatherOnMap(weather, position, true);
         setInterval(() => {
@@ -252,6 +253,7 @@
           content: buildBoatMarker(directionDegrees(weather.wind_direction)),
           anchorLeft: "-50%",
           anchorTop: "-50%",
+          gmpClickable: true,
         });
         marker.addEventListener("gmp-click", (event) => {
           event.domEvent?.stopPropagation();
@@ -298,6 +300,62 @@
       } else {
         openInfoWindow();
       }
+    }
+
+    function handleMapClick(event) {
+      const clickedPosition = event.latLng
+        ? { lat: event.latLng.lat(), lng: event.latLng.lng() }
+        : null;
+      const bargePosition = positionLiteral(marker?.position);
+
+      if (
+        clickedPosition
+        && bargePosition
+        && distanceMetres(clickedPosition, bargePosition) <= BARGE_CLICK_RADIUS_METRES
+      ) {
+        openInfoWindow();
+        return;
+      }
+
+      closeInfoWindow();
+    }
+
+    function distanceMetres(left, right) {
+      if (
+        !Number.isFinite(left.lat)
+        || !Number.isFinite(left.lng)
+        || !Number.isFinite(right.lat)
+        || !Number.isFinite(right.lng)
+      ) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      const earthRadiusMetres = 6371000;
+      const latitudeDelta = degreesToRadians(right.lat - left.lat);
+      const longitudeDelta = degreesToRadians(right.lng - left.lng);
+      const leftLatitude = degreesToRadians(left.lat);
+      const rightLatitude = degreesToRadians(right.lat);
+      const haversine = Math.sin(latitudeDelta / 2) ** 2
+        + Math.cos(leftLatitude) * Math.cos(rightLatitude)
+        * Math.sin(longitudeDelta / 2) ** 2;
+      return earthRadiusMetres * 2 * Math.atan2(
+        Math.sqrt(haversine),
+        Math.sqrt(1 - haversine),
+      );
+    }
+
+    function positionLiteral(position) {
+      if (!position) {
+        return null;
+      }
+
+      const lat = typeof position.lat === "function" ? position.lat() : Number(position.lat);
+      const lng = typeof position.lng === "function" ? position.lng() : Number(position.lng);
+      return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+    }
+
+    function degreesToRadians(value) {
+      return value * Math.PI / 180;
     }
 
     async function fetchWeather() {
