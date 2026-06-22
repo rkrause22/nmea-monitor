@@ -215,7 +215,7 @@
         id: "plot",
         label: "Plot",
         frameTitle: "Wind plot",
-        url: (config) => nmeaPageUrl("nmea-plot.html", config, { includeSpan: true }),
+        url: (config) => nmeaPageUrl("nmea-plot.html", config, { includeHistory: true }),
       },
       {
         id: "map",
@@ -355,6 +355,12 @@
       if (config.span) {
         params.set("span", config.span);
       }
+      if (config.start) {
+        params.set("start", config.start);
+      }
+      if (config.end) {
+        params.set("end", config.end);
+      }
       params.set("view", view);
       return `/nmea-frame.html?${params.toString()}`;
     }
@@ -366,8 +372,16 @@
       if (config.rate) {
         params.set("rate", config.rate);
       }
-      if (options.includeSpan && config.span) {
-        params.set("span", config.span);
+      if (options.includeHistory) {
+        if (config.span) {
+          params.set("span", config.span);
+        }
+        if (config.start) {
+          params.set("start", config.start);
+        }
+        if (config.end) {
+          params.set("end", config.end);
+        }
       }
       return `/${page}?${params.toString()}`;
     }
@@ -378,6 +392,8 @@
         source: firstQueryValue("src", "source"),
         rate: firstQueryValue("rate"),
         span: firstQueryValue("span"),
+        start: firstQueryValue("start"),
+        end: firstQueryValue("end"),
         view: firstQueryValue("view") || DEFAULT_VIEW,
       };
     }
