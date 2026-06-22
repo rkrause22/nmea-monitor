@@ -3,14 +3,30 @@
 from __future__ import annotations
 
 import os
-import traceback
 import math
+import re
+import traceback
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 
 LOG_RETENTION_DAYS = 365
+QUERY_TIME_PATTERN = re.compile(
+    r"^"
+    r"(?P<year>\d{4})"
+    r"(?:-(?P<month>\d{2})"
+    r"(?:-(?P<day>\d{2})"
+    r"(?:T(?P<hour>\d{2})"
+    r"(?::(?P<minute>\d{2})"
+    r"(?::(?P<second>\d{2}))?"
+    r")?"
+    r"(?P<offset>Z|[+-]\d{2}:\d{2})?"
+    r")?"
+    r")?"
+    r")?"
+    r"$"
+)
 
 
 def format_utc_datetime(value: datetime) -> str:
@@ -48,22 +64,73 @@ def parse_utc_date(value: str) -> date:
 
 def parse_query_time_range(value: str) -> tuple[datetime, datetime]:
     text = value.strip()
-    formats = [
-        ("%Y", "year"),
-        ("%Y-%m", "month"),
-        ("%Y-%m-%d", "day"),
-        ("%Y-%m-%d:%H", "hour"),
-        ("%Y-%m-%d:%H:%M", "minute"),
-        ("%Y-%m-%d:%H:%M:%S", "second"),
-    ]
-    for format_text, precision in formats:
-        try:
-            start = datetime.strptime(text, format_text)
-        except ValueError:
-            continue
-        return start, next_boundary(start, precision)
+    match = QUERY_TIME_PATTERN.fullmatch(text)
+    if match is None:
+        raise ValueError(
+            "time values must use ISO format like "
+            "yyyy[-mm[-dd[Thh[:mm[:ss]][Z|+hh:mm|-hh:mm]]]]"
+        )
 
-    raise ValueError("time values must use yyyy[-mm[-dd[:hh[:mm[:ss]]]]]")
+    year = int(match.group("year"))
+    month_text = match.group("month")
+    day_text = match.group("day")
+    hour_text = match.group("hour")
+    minute_text = match.group("minute")
+    second_text = match.group("second")
+    offset_text = match.group("offset")
+
+    precision = "year"
+    month = 1
+    day = 1
+    hour = 0
+    minute = 0
+    second = 0
+
+    if month_text is not None:
+        month = int(month_text)
+        precision = "month"
+    if day_text is not None:
+        day = int(day_text)
+        precision = "day"
+    if hour_text is not None:
+        hour = int(hour_text)
+        precision = "hour"
+    if minute_text is not None:
+        minute = int(minute_text)
+        precision = "minute"
+    if second_text is not None:
+        second = int(second_text)
+        precision = "second"
+
+    tzinfo = timezone.utc
+    if offset_text is not None and offset_text != "Z":
+        sign = 1 if offset_text[0] == "+" else -1
+        offset_hours = int(offset_text[1:3])
+        offset_minutes = int(offset_text[4:6])
+        offset_delta = timedelta(hours=offset_hours, minutes=offset_minutes)
+        tzinfo = timezone(sign * offset_delta)
+
+    try:
+        start = datetime(
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            tzinfo=tzinfo,
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "time values must use ISO format like "
+            "yyyy[-mm[-dd[Thh[:mm[:ss]][Z|+hh:mm|-hh:mm]]]]"
+        ) from exc
+
+    end = next_boundary(start, precision)
+    return (
+        start.astimezone(timezone.utc).replace(tzinfo=None),
+        end.astimezone(timezone.utc).replace(tzinfo=None),
+    )
 
 
 def next_boundary(value: datetime, precision: str) -> datetime:

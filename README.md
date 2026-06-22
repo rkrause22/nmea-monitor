@@ -66,7 +66,7 @@ Endpoints:
 * `GET /<filename>.html`
   Serves a static HTML file from the repository directory.
 
-Time query values use `yyyy[-mm[-dd[:hh[:mm[:ss]]]]]`.
+Time query values use ISO-style forms such as `2026`, `2026-06`, `2026-06-20`, `2026-06-20T14`, `2026-06-20T14:00`, or `2026-06-20T14:00:00-06:00`. Missing time parts default to zero.
 
 Timespan values use forms such as `30-seconds`, `15-minutes`, `2-hours`, `7-days`, `1-month`, or `1-year`.
 
