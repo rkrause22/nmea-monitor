@@ -196,6 +196,7 @@
     let mapsApiLoadStarted = false;
     let lastWeatherPosition = null;
     let lastWindDirection = null;
+    let isInfoWindowOpen = true;
 
     if (!requestConfig.org || !requestConfig.source) {
       document.title = "Weather Map";
@@ -218,6 +219,10 @@
         });
 
         infoWindow = new google.maps.InfoWindow();
+        infoWindow.addListener("closeclick", () => {
+          isInfoWindowOpen = false;
+        });
+        map.addListener("click", closeInfoWindow);
 
         renderWeatherOnMap(weather, position, true);
         setInterval(() => {
@@ -248,7 +253,10 @@
           anchorLeft: "-50%",
           anchorTop: "-50%",
         });
-        marker.addEventListener("gmp-click", () => infoWindow.open({ anchor: marker, map }));
+        marker.addEventListener("gmp-click", (event) => {
+          event.domEvent?.stopPropagation();
+          toggleInfoWindow();
+        });
       } else {
         marker.position = position;
         marker.title = formatTitle(weather);
@@ -268,8 +276,28 @@
 
       document.title = popupTitle(weather);
       infoWindow.setContent(renderWeatherCard(weather));
-      infoWindow.open({ anchor: marker, map });
+      if (isInfoWindowOpen) {
+        openInfoWindow();
+      }
       setStatus(`Updated ${formatLocalDateTime(new Date())}`);
+    }
+
+    function openInfoWindow() {
+      isInfoWindowOpen = true;
+      infoWindow.open({ anchor: marker, map });
+    }
+
+    function closeInfoWindow() {
+      isInfoWindowOpen = false;
+      infoWindow.close();
+    }
+
+    function toggleInfoWindow() {
+      if (isInfoWindowOpen) {
+        closeInfoWindow();
+      } else {
+        openInfoWindow();
+      }
     }
 
     async function fetchWeather() {
