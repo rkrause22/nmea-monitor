@@ -246,7 +246,9 @@
     });
 
     elements.refreshButton.addEventListener("click", () => {
-      window.location.reload();
+      const params = new URLSearchParams();
+      params.set("view", displayForId(elements.viewSelect.value).id);
+      window.location.assign(`${window.location.pathname}?${params.toString()}`);
     });
 
     const requestConfig = readRequestConfig();
@@ -255,7 +257,7 @@
       elements.subtitle.textContent = "Query string required";
       elements.message.classList.add("show");
       elements.frame.style.display = "none";
-      selectDisplay(DEFAULT_VIEW);
+      selectDisplay(requestConfig.view);
     } else {
       const activeDisplay = displayForId(requestConfig.view);
       const frameTitle = `${requestConfig.org} ${requestConfig.source}`;
