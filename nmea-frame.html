@@ -540,13 +540,13 @@
       }
     });
 
+    let frameResizeObserver;
+    let frameResizeCleanup;
+
     const requestConfig = readRequestConfig();
 
     initializeAdvancedForm(requestConfig);
     renderFrame(requestConfig);
-
-    let frameResizeObserver;
-    let frameResizeCleanup;
 
     function startFrameResizer() {
       if (frameResizeObserver) {
