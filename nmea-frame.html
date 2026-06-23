@@ -118,6 +118,159 @@
       outline: none;
     }
 
+    .advanced-toggle[aria-expanded="true"] {
+      color: #f5f9fc;
+      border-color: #5c738a;
+    }
+
+    .advanced-toggle[aria-expanded="true"] .advanced-toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    .advanced-toggle-icon {
+      display: block;
+      transition: transform 160ms ease;
+    }
+
+    .advanced-panel {
+      padding: 14px 20px 18px;
+      background: #0d1319;
+      border-bottom: 1px solid #24313e;
+    }
+
+    .advanced-panel[hidden],
+    .control-group[hidden] {
+      display: none;
+    }
+
+    .advanced-form {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      align-items: end;
+    }
+
+    .control-group {
+      min-width: 0;
+    }
+
+    .control-label,
+    .time-mode-legend {
+      display: block;
+      margin: 0 0 6px;
+      color: #99a7b5;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .time-mode {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .time-mode-options {
+      display: flex;
+      min-height: 42px;
+      border: 1px solid #324253;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #0f161d;
+    }
+
+    .time-mode-option {
+      display: inline-flex;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-width: 0;
+      padding: 9px 10px;
+      color: #cfd9e3;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .time-mode-option + .time-mode-option {
+      border-left: 1px solid #324253;
+    }
+
+    .time-mode-option.selected {
+      background: #1e3447;
+      color: #f5f9fc;
+    }
+
+    .time-mode-option input {
+      margin: 0;
+      accent-color: #78b7e8;
+    }
+
+    .control-input,
+    .control-select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid #324253;
+      border-radius: 6px;
+      background: #0f161d;
+      color: #cfd9e3;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .control-input {
+      padding: 9px 10px;
+    }
+
+    .control-select {
+      padding: 9px 36px 9px 12px;
+    }
+
+    .date-time-pair {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+      gap: 8px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .action-button {
+      min-height: 42px;
+      border: 1px solid #324253;
+      border-radius: 6px;
+      padding: 9px 14px;
+      background: #0f161d;
+      color: #cfd9e3;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .action-button.primary {
+      background: #1e5d87;
+      border-color: #2f7db1;
+      color: #f5f9fc;
+    }
+
+    .control-input:hover,
+    .control-input:focus-visible,
+    .control-select:hover,
+    .control-select:focus-visible,
+    .action-button:hover,
+    .action-button:focus-visible {
+      border-color: #5c738a;
+      color: #f5f9fc;
+      outline: none;
+    }
+
     .frame-wrap {
       padding: 12px;
     }
@@ -178,6 +331,30 @@
         min-height: calc(99vh - 152px);
       }
     }
+
+    @media (max-width: 959px) {
+      .advanced-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 679px) {
+      .advanced-form {
+        grid-template-columns: 1fr;
+      }
+
+      .date-time-pair {
+        grid-template-columns: 1fr;
+      }
+
+      .form-actions {
+        justify-content: stretch;
+      }
+
+      .action-button {
+        flex: 1;
+      }
+    }
   </style>
 </head>
 <body>
@@ -191,8 +368,66 @@
         <label for="view-select" class="sr-only">Display</label>
         <select id="view-select" class="view-select" aria-label="Display"></select>
         <button id="refresh-button" class="icon-button" type="button" title="Refresh page" aria-label="Refresh page">&#x21bb;</button>
+        <button id="advanced-toggle" class="icon-button advanced-toggle" type="button" title="Advanced controls" aria-label="Advanced controls" aria-expanded="false" aria-controls="advanced-panel">
+          <span class="advanced-toggle-icon" aria-hidden="true">&#x25be;</span>
+        </button>
       </nav>
     </header>
+
+    <section id="advanced-panel" class="advanced-panel" hidden>
+      <form id="advanced-form" class="advanced-form">
+        <fieldset class="control-group time-mode">
+          <legend class="time-mode-legend">Time Mode</legend>
+          <div class="time-mode-options">
+            <label class="time-mode-option selected">
+              <input type="radio" name="time-mode" value="latest" checked>
+              <span>Latest</span>
+            </label>
+            <label class="time-mode-option">
+              <input type="radio" name="time-mode" value="duration">
+              <span>Duration</span>
+            </label>
+            <label class="time-mode-option">
+              <input type="radio" name="time-mode" value="period">
+              <span>Period</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div id="start-group" class="control-group" hidden>
+          <label class="control-label" for="start-date">Start</label>
+          <div class="date-time-pair">
+            <input id="start-date" class="control-input" type="date">
+            <input id="start-time" class="control-input" type="time" step="60">
+          </div>
+        </div>
+
+        <div id="end-group" class="control-group" hidden>
+          <label class="control-label" for="end-date">End</label>
+          <div class="date-time-pair">
+            <input id="end-date" class="control-input" type="date">
+            <input id="end-time" class="control-input" type="time" step="60">
+          </div>
+        </div>
+
+        <div id="span-group" class="control-group">
+          <label class="control-label" for="span-select">Time Span</label>
+          <select id="span-select" class="control-select">
+            <option value="30-minutes">30 minutes</option>
+            <option value="1-hour">1 hour</option>
+            <option value="2-hours">2 hours</option>
+            <option value="3-hours">3 hours</option>
+            <option value="6-hours">6 hours</option>
+            <option value="12-hours">12 hours</option>
+          </select>
+        </div>
+
+        <div class="control-group form-actions">
+          <button id="apply-advanced" class="action-button primary" type="submit">Apply</button>
+          <button id="clear-advanced" class="action-button" type="button">Clear</button>
+        </div>
+      </form>
+    </section>
 
     <main class="frame-wrap">
       <p id="message" class="message">Add ?org=&lt;org&gt;&amp;src=&lt;source&gt; to the page URL.</p>
@@ -213,6 +448,7 @@
     const FRAME_QUERY_FIELDS = ["org", "src", "rate", "span", "start", "end", "view"];
     const RESET_QUERY_FIELDS = ["org", "src", "view"];
     const NMEA_DISPLAY_QUERY_FIELDS = ["org", "src", "rate", "span", "start", "end"];
+    const DEFAULT_SPAN = "30-minutes";
     const DISPLAYS = [
       {
         id: "plot",
@@ -240,6 +476,18 @@
       subtitle: document.getElementById("subtitle"),
       viewSelect: document.getElementById("view-select"),
       refreshButton: document.getElementById("refresh-button"),
+      advancedToggle: document.getElementById("advanced-toggle"),
+      advancedPanel: document.getElementById("advanced-panel"),
+      advancedForm: document.getElementById("advanced-form"),
+      startGroup: document.getElementById("start-group"),
+      startDate: document.getElementById("start-date"),
+      startTime: document.getElementById("start-time"),
+      endGroup: document.getElementById("end-group"),
+      endDate: document.getElementById("end-date"),
+      endTime: document.getElementById("end-time"),
+      spanGroup: document.getElementById("span-group"),
+      spanSelect: document.getElementById("span-select"),
+      clearAdvanced: document.getElementById("clear-advanced"),
       frame: document.getElementById("content-frame"),
       message: document.getElementById("message"),
     };
@@ -254,8 +502,36 @@
       window.location.assign(frameUrl(requestConfig, RESET_QUERY_FIELDS));
     });
 
+    elements.advancedToggle.addEventListener("click", () => {
+      if (elements.advancedPanel.hidden) {
+        setAdvancedOpen(true);
+      } else {
+        setAdvancedOpen(false);
+        if (hasAdvancedQuery(requestConfig)) {
+          window.location.assign(frameUrl(requestConfig, RESET_QUERY_FIELDS));
+        }
+      }
+    });
+
+    elements.advancedForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      window.location.assign(frameUrl(configFromAdvancedForm(requestConfig)));
+    });
+
+    elements.clearAdvanced.addEventListener("click", () => {
+      resetCurrentAdvancedMode();
+      window.location.assign(frameUrl(configFromAdvancedForm(requestConfig)));
+    });
+
+    for (const option of Array.from(elements.advancedForm.elements["time-mode"])) {
+      option.addEventListener("change", () => {
+        syncAdvancedControls({ resetVisibleDefaults: true });
+      });
+    }
+
     const requestConfig = readRequestConfig();
 
+    resetAdvancedForm();
     renderFrame(requestConfig);
 
     let frameResizeObserver;
@@ -349,6 +625,170 @@
       selectDisplay(activeDisplay.id);
       elements.frame.title = activeDisplay.frameTitle;
       elements.frame.src = displayUrl(activeDisplay, config);
+    }
+
+    function setAdvancedOpen(isOpen) {
+      elements.advancedPanel.hidden = !isOpen;
+      elements.advancedToggle.setAttribute("aria-expanded", String(isOpen));
+      if (isOpen) {
+        resetAdvancedForm();
+      } else {
+        clearAdvancedFields();
+      }
+      startFrameResizer();
+    }
+
+    function syncAdvancedControls(options = {}) {
+      const mode = currentTimeMode();
+      const showStart = mode === "duration" || mode === "period";
+      const showEnd = mode === "period";
+      const showSpan = mode === "latest" || mode === "duration";
+
+      updateTimeModeSelection(mode);
+      elements.startGroup.hidden = !showStart;
+      elements.endGroup.hidden = !showEnd;
+      elements.spanGroup.hidden = !showSpan;
+
+      if (!showStart) {
+        clearDateTime("start");
+      }
+      if (!showEnd) {
+        clearDateTime("end");
+      }
+      if (!showSpan) {
+        elements.spanSelect.value = "";
+      }
+
+      if (options.resetVisibleDefaults) {
+        applyModeDefaults(mode);
+      }
+    }
+
+    function resetAdvancedForm() {
+      elements.advancedForm.elements["time-mode"].value = "latest";
+      clearAdvancedFields();
+      applyModeDefaults("latest");
+      syncAdvancedControls();
+    }
+
+    function resetCurrentAdvancedMode() {
+      const mode = currentTimeMode();
+      clearAdvancedFields();
+      applyModeDefaults(mode);
+      syncAdvancedControls();
+    }
+
+    function clearAdvancedFields() {
+      clearDateTime("start");
+      clearDateTime("end");
+      elements.spanSelect.value = DEFAULT_SPAN;
+    }
+
+    function applyModeDefaults(mode) {
+      const now = new Date();
+      if (mode === "latest") {
+        elements.spanSelect.value = DEFAULT_SPAN;
+        clearDateTime("start");
+        clearDateTime("end");
+        return;
+      }
+
+      if (mode === "duration") {
+        setDateTime("start", now);
+        elements.spanSelect.value = DEFAULT_SPAN;
+        clearDateTime("end");
+        return;
+      }
+
+      if (mode === "period") {
+        setDateTime("start", new Date(now.getTime() - 30 * 60 * 1000));
+        setDateTime("end", now);
+        elements.spanSelect.value = "";
+      }
+    }
+
+    function configFromAdvancedForm(config) {
+      const mode = currentTimeMode();
+      const nextConfig = {
+        ...config,
+        span: "",
+        start: "",
+        end: "",
+      };
+
+      if (mode === "latest") {
+        nextConfig.span = elements.spanSelect.value || DEFAULT_SPAN;
+      } else if (mode === "duration") {
+        nextConfig.start = requestDateTime("start");
+        nextConfig.span = elements.spanSelect.value || DEFAULT_SPAN;
+      } else if (mode === "period") {
+        nextConfig.start = requestDateTime("start");
+        nextConfig.end = requestDateTime("end");
+      }
+
+      return nextConfig;
+    }
+
+    function currentTimeMode() {
+      return elements.advancedForm.elements["time-mode"].value;
+    }
+
+    function updateTimeModeSelection(mode) {
+      for (const label of elements.advancedForm.querySelectorAll(".time-mode-option")) {
+        const input = label.querySelector("input");
+        label.classList.toggle("selected", input && input.value === mode);
+      }
+    }
+
+    function hasAdvancedQuery(config) {
+      return Boolean(config.span || config.start || config.end);
+    }
+
+    function setDateTime(prefix, date) {
+      elements[`${prefix}Date`].value = localDateValue(date);
+      elements[`${prefix}Time`].value = localTimeValue(date);
+    }
+
+    function clearDateTime(prefix) {
+      elements[`${prefix}Date`].value = "";
+      elements[`${prefix}Time`].value = "";
+    }
+
+    function requestDateTime(prefix) {
+      const date = elements[`${prefix}Date`].value;
+      const time = elements[`${prefix}Time`].value;
+      if (!date || !time) {
+        return "";
+      }
+
+      const [year, month, day] = date.split("-").map(Number);
+      const [hour, minute] = time.split(":").map(Number);
+      const localDate = new Date(year, month - 1, day, hour, minute, 0);
+      return `${date}T${time}:00${localOffsetValue(localDate)}`;
+    }
+
+    function localDateValue(date) {
+      return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0"),
+      ].join("-");
+    }
+
+    function localTimeValue(date) {
+      return [
+        String(date.getHours()).padStart(2, "0"),
+        String(date.getMinutes()).padStart(2, "0"),
+      ].join(":");
+    }
+
+    function localOffsetValue(date) {
+      const offsetMinutes = -date.getTimezoneOffset();
+      const sign = offsetMinutes >= 0 ? "+" : "-";
+      const absoluteMinutes = Math.abs(offsetMinutes);
+      const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, "0");
+      const minutes = String(absoluteMinutes % 60).padStart(2, "0");
+      return `${sign}${hours}:${minutes}`;
     }
 
     function frameUrl(config, fields = FRAME_QUERY_FIELDS) {
