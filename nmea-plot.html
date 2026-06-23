@@ -697,7 +697,7 @@
     }
 
     function renderHistory(history, samples) {
-      const title = `Wind at ${displayValue(history.org)} ${displayValue(history.source)}`;
+      const title = `Conditions at ${displayValue(history.org)} ${displayValue(history.source)}`;
       document.title = title;
       elements.heading.textContent = title;
       elements.subheading.textContent = describeWindow(history, samples);
