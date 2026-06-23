@@ -628,7 +628,7 @@
     function renderWeatherTime(weather) {
       if (weather.utc_end_time) {
         return `
-          ${escapeHtml(formatLocalDateTime(weather.utc_time))} - ${escapeHtml(formatLocalDateTime(weather.utc_end_time))}
+          ${escapeHtml(formatLocalDateTime(weather.utc_time))} -<br/> ${escapeHtml(formatLocalDateTime(weather.utc_end_time))}
         `;
       }
 
