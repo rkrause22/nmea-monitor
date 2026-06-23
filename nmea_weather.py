@@ -59,7 +59,7 @@ def build_weather_summary(
 ) -> dict[str, object]:
     frame = FrameAggregator()
     utc_time = records[0].utc
-    utc_end_time = records[-1].utc
+    utc_end_time = records[0].utc
 
     for record in records:
         for raw_sentence in record.sentences:
@@ -68,7 +68,7 @@ def build_weather_summary(
             try:
                 sentence = parse_sentence(raw_sentence)
                 if sentence.sentence_type == "ZDA":
-                    utc_time = parse_zda_datetime(sentence).replace(tzinfo=None)
+                    utc_end_time = parse_zda_datetime(sentence).replace(tzinfo=None)
                 else:
                     frame.add_sentence(sentence)
             except NMEAError as exc:
@@ -110,8 +110,8 @@ def build_weather_summary(
         "windward": windward,
         "startpin": startpin,
     }
-    #if utc_end_time - utc_time > timedelta(minutes=1):
-    summary["utc_end_time"] = format_utc_datetime(utc_end_time)
+    if utc_end_time - utc_time > timedelta(minutes=1):
+        summary["utc_end_time"] = format_utc_datetime(utc_end_time)
     return summary
 
 
