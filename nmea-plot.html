@@ -707,6 +707,8 @@
 
       elements.plotFrame.innerHTML = renderPlotSvg(samples, {
         meanDirection: Number.isFinite(meanDirection) ? meanDirection : 0,
+        windowStart: dateOrNull(history.query_start_utc_time),
+        windowEnd: dateOrNull(history.query_end_utc_time),
       });
     }
 
@@ -936,9 +938,11 @@
 
     function renderPlotSvg(samples, context) {
       const meanDirection = context.meanDirection;
-      const latestTime = samples[samples.length - 1].time.getTime();
-      const earliestTime = samples[0].time.getTime();
-      const duration = Math.max(latestTime - earliestTime, 1);
+      const plotStartTime = context.windowStart || samples[0].time;
+      const plotEndTime = context.windowEnd || samples[samples.length - 1].time;
+      const plotStartMs = plotStartTime.getTime();
+      const plotEndMs = Math.max(plotEndTime.getTime(), plotStartMs + 1);
+      const duration = plotEndMs - plotStartMs;
       const offsets = samples.map((sample) => signedAngleDifference(sample.direction, meanDirection));
       const range = buildDisplayRange(offsets);
       const startOffset = -range.negative;
@@ -948,7 +952,7 @@
       const endAngle = meanDirection + endOffset;
       const angleStep = chooseAngleStep(sectorSpan);
       const boundaryOffsets = buildOffsetTicks(startOffset, endOffset, angleStep);
-      const radialTicks = buildRadialTicks(samples[0].time, samples[samples.length - 1].time, 6);
+      const radialTicks = buildRadialTicks(plotStartTime, new Date(plotEndMs), 6);
       const strengthPeriods = buildWindStrengthPeriods(samples, radialTicks);
       const width = 1040;
       const height = 980;
@@ -964,7 +968,7 @@
       const centerY = plotRoot.y;
 
       const samplePoints = samples.map((sample) => {
-        const radius = innerRadius + ((sample.time.getTime() - earliestTime) / duration) * (outerRadius - innerRadius);
+        const radius = innerRadius + (clamp((sample.time.getTime() - plotStartMs) / duration, 0, 1)) * (outerRadius - innerRadius);
         return polarPoint(
           centerX,
           centerY,
@@ -974,7 +978,7 @@
       });
 
       const averagePoints = samples.map((sample, index) => {
-        const radius = innerRadius + ((sample.time.getTime() - earliestTime) / duration) * (outerRadius - innerRadius);
+        const radius = innerRadius + (clamp((sample.time.getTime() - plotStartMs) / duration, 0, 1)) * (outerRadius - innerRadius);
         const rollingDirection = Number.isFinite(sample.rollingDirection) ? sample.rollingDirection : meanDirection;
         const point = polarPoint(
           centerX,
@@ -1294,9 +1298,18 @@
     }
 
     function describeWindow(history, samples) {
-      const startValue = history.oldest_utc_time || samples[0].time;
-      const endValue = history.latest_utc_time || samples[samples.length - 1].time;
+      const startValue = history.query_start_utc_time || history.oldest_utc_time || samples[0].time;
+      const endValue = history.query_end_utc_time || history.latest_utc_time || samples[samples.length - 1].time;
       return `${formatLocalClockTime(startValue)} to ${formatLocalClockTime(endValue)} (${formatLocalDisplayDate(endValue)})`;
+    }
+
+    function dateOrNull(value) {
+      if (!value) {
+        return null;
+      }
+
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
     }
 
     function formatDegreesLabel(value) {
