@@ -663,7 +663,7 @@
       setStatus("Add ?org=<org>&src=<source> to the page URL.", true);
       elements.subheading.textContent = "Query string required";
     } else {
-      elements.heading.textContent = `Wind at ${requestConfig.org} ${requestConfig.source}`;
+      elements.heading.textContent = `Conditions at ${requestConfig.org} ${requestConfig.source}`;
       elements.subheading.textContent = "Loading...";
       refreshHistory();
       setInterval(refreshHistory, requestConfig.refreshIntervalMs);
