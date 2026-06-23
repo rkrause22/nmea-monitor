@@ -231,13 +231,27 @@
     }
 
     function weatherUrl(config) {
-      return `/nmea/weather/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}`;
+      const params = new URLSearchParams();
+      if (config.start) {
+        params.set("start", config.start);
+      }
+      if (config.end) {
+        params.set("end", config.end);
+      }
+      if (config.span) {
+        params.set("span", config.span);
+      }
+      const query = params.size === 0 ? "" : `?${params.toString()}`;
+      return `/nmea/weather/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}${query}`;
     }
 
     function readRequestConfig() {
       return {
         org: firstQueryValue("org"),
         source: firstQueryValue("src", "source"),
+        span: firstQueryValue("span"),
+        start: firstQueryValue("start"),
+        end: firstQueryValue("end"),
         refreshIntervalMs: readRefreshIntervalMs(),
       };
     }
