@@ -124,11 +124,16 @@
     }
 
     .advanced-toggle[aria-expanded="true"] .advanced-toggle-icon {
-      transform: rotate(180deg);
+      transform: rotate(-135deg);
     }
 
     .advanced-toggle-icon {
       display: block;
+      width: 13px;
+      height: 13px;
+      border: solid currentColor;
+      border-width: 0 3px 3px 0;
+      transform: rotate(45deg);
       transition: transform 160ms ease;
     }
 
@@ -369,7 +374,7 @@
         <select id="view-select" class="view-select" aria-label="Display"></select>
         <button id="refresh-button" class="icon-button" type="button" title="Refresh page" aria-label="Refresh page">&#x21bb;</button>
         <button id="advanced-toggle" class="icon-button advanced-toggle" type="button" title="Advanced controls" aria-label="Advanced controls" aria-expanded="false" aria-controls="advanced-panel">
-          <span class="advanced-toggle-icon" aria-hidden="true">&#x25be;</span>
+          <span class="advanced-toggle-icon" aria-hidden="true"></span>
         </button>
       </nav>
     </header>
@@ -529,9 +534,15 @@
       });
     }
 
+    elements.spanSelect.addEventListener("change", () => {
+      if (currentTimeMode() === "duration") {
+        setDateTime("start", startForSpan(elements.spanSelect.value || DEFAULT_SPAN));
+      }
+    });
+
     const requestConfig = readRequestConfig();
 
-    resetAdvancedForm();
+    initializeAdvancedForm(requestConfig);
     renderFrame(requestConfig);
 
     let frameResizeObserver;
@@ -627,11 +638,13 @@
       elements.frame.src = displayUrl(activeDisplay, config);
     }
 
-    function setAdvancedOpen(isOpen) {
+    function setAdvancedOpen(isOpen, options = {}) {
       elements.advancedPanel.hidden = !isOpen;
       elements.advancedToggle.setAttribute("aria-expanded", String(isOpen));
       if (isOpen) {
-        resetAdvancedForm();
+        if (options.reset !== false) {
+          resetAdvancedForm();
+        }
       } else {
         clearAdvancedFields();
       }
@@ -694,8 +707,8 @@
       }
 
       if (mode === "duration") {
-        setDateTime("start", now);
         elements.spanSelect.value = DEFAULT_SPAN;
+        setDateTime("start", startForSpan(elements.spanSelect.value));
         clearDateTime("end");
         return;
       }
@@ -705,6 +718,45 @@
         setDateTime("end", now);
         elements.spanSelect.value = "";
       }
+    }
+
+    function initializeAdvancedForm(config) {
+      resetAdvancedForm();
+      if (!hasAdvancedQuery(config)) {
+        setAdvancedOpen(false);
+        return;
+      }
+
+      populateAdvancedForm(config);
+      setAdvancedOpen(true, { reset: false });
+    }
+
+    function populateAdvancedForm(config) {
+      const mode = advancedModeForConfig(config);
+      elements.advancedForm.elements["time-mode"].value = mode;
+      clearAdvancedFields();
+
+      if (config.span && mode !== "period") {
+        elements.spanSelect.value = config.span;
+      }
+      if (config.start) {
+        setDateTimeFromText("start", config.start);
+      }
+      if (config.end) {
+        setDateTimeFromText("end", config.end);
+      }
+
+      syncAdvancedControls();
+    }
+
+    function advancedModeForConfig(config) {
+      if (config.start && config.end) {
+        return "period";
+      }
+      if (config.start && config.span) {
+        return "duration";
+      }
+      return "latest";
     }
 
     function configFromAdvancedForm(config) {
@@ -749,6 +801,34 @@
       elements[`${prefix}Time`].value = localTimeValue(date);
     }
 
+    function setDateTimeFromText(prefix, value) {
+      const date = dateFromRequestValue(value);
+      if (date) {
+        setDateTime(prefix, date);
+      }
+    }
+
+    function dateFromRequestValue(value) {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+
+      const match = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2})(?::(\d{2}))?)?/);
+      if (!match) {
+        return null;
+      }
+
+      return new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        Number(match[4] || 0),
+        Number(match[5] || 0),
+        0
+      );
+    }
+
     function clearDateTime(prefix) {
       elements[`${prefix}Date`].value = "";
       elements[`${prefix}Time`].value = "";
@@ -789,6 +869,21 @@
       const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, "0");
       const minutes = String(absoluteMinutes % 60).padStart(2, "0");
       return `${sign}${hours}:${minutes}`;
+    }
+
+    function startForSpan(span) {
+      return new Date(Date.now() - spanMilliseconds(span));
+    }
+
+    function spanMilliseconds(span) {
+      const match = span.match(/^(\d+)-(minute|minutes|hour|hours)$/);
+      if (!match) {
+        return 30 * 60 * 1000;
+      }
+
+      const amount = Number(match[1]);
+      const unit = match[2];
+      return amount * (unit.startsWith("hour") ? 60 * 60 * 1000 : 60 * 1000);
     }
 
     function frameUrl(config, fields = FRAME_QUERY_FIELDS) {
