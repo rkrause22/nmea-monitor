@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from functools import partial
 from pathlib import Path
 
@@ -267,7 +267,7 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
         history["end"] = end_text
         history["span"] = span_text
         history["query_start_utc_time"] = format_utc_datetime(start) if start is not None else None
-        history["query_end_utc_time"] = format_utc_datetime(end - timedelta(milliseconds=1)) if end is not None else None
+        history["query_end_utc_time"] = format_utc_datetime(end) if end is not None else None
         return jsonify(history)
 
     @app.get("/nmea/weather/<org>/<source>")

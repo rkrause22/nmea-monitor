@@ -535,13 +535,17 @@
     }
 
     elements.spanSelect.addEventListener("change", () => {
-      if (currentTimeMode() === "duration") {
+      if (currentTimeMode() === "duration" && !startDateTimeEdited) {
         setDateTime("start", startForSpan(elements.spanSelect.value || DEFAULT_SPAN));
       }
     });
 
+    elements.startDate.addEventListener("input", markStartDateTimeEdited);
+    elements.startTime.addEventListener("input", markStartDateTimeEdited);
+
     let frameResizeObserver;
     let frameResizeCleanup;
+    let startDateTimeEdited = false;
 
     const requestConfig = readRequestConfig();
 
@@ -679,6 +683,7 @@
 
     function resetAdvancedForm() {
       elements.advancedForm.elements["time-mode"].value = "latest";
+      startDateTimeEdited = false;
       clearAdvancedFields();
       applyModeDefaults("latest");
       syncAdvancedControls();
@@ -686,6 +691,7 @@
 
     function resetCurrentAdvancedMode() {
       const mode = currentTimeMode();
+      startDateTimeEdited = false;
       clearAdvancedFields();
       applyModeDefaults(mode);
       syncAdvancedControls();
@@ -700,6 +706,7 @@
     function applyModeDefaults(mode) {
       const now = new Date();
       if (mode === "latest") {
+        startDateTimeEdited = false;
         elements.spanSelect.value = DEFAULT_SPAN;
         clearDateTime("start");
         clearDateTime("end");
@@ -707,6 +714,7 @@
       }
 
       if (mode === "duration") {
+        startDateTimeEdited = false;
         elements.spanSelect.value = DEFAULT_SPAN;
         setDateTime("start", startForSpan(elements.spanSelect.value));
         clearDateTime("end");
@@ -714,6 +722,7 @@
       }
 
       if (mode === "period") {
+        startDateTimeEdited = false;
         setDateTime("start", new Date(now.getTime() - 30 * 60 * 1000));
         setDateTime("end", now);
         elements.spanSelect.value = "";
@@ -747,6 +756,7 @@
       }
 
       syncAdvancedControls();
+      startDateTimeEdited = false;
     }
 
     function advancedModeForConfig(config) {
@@ -790,6 +800,10 @@
         const input = label.querySelector("input");
         label.classList.toggle("selected", input && input.value === mode);
       }
+    }
+
+    function markStartDateTimeEdited() {
+      startDateTimeEdited = true;
     }
 
     function hasAdvancedQuery(config) {
