@@ -100,6 +100,11 @@
       overflow-wrap: anywhere;
     }
 
+    .time-range-line {
+      display: block;
+      white-space: nowrap;
+    }
+
     .cell-icon {
       width: 26px;
       height: 26px;
@@ -584,7 +589,7 @@
                 <th scope="row" aria-label="Local date time">
                   ${clockIcon()}
                 </th>
-                <td class="value-cell">${escapeHtml(formatLocalDateTime(weather.utc_time))}</td>
+                <td class="value-cell">${renderWeatherTime(weather)}</td>
               </tr>
               <tr>
                 <th scope="row" aria-label="Temperature">
@@ -618,6 +623,17 @@
         dateStyle: "short",
         timeStyle: "short",
       }).format(date);
+    }
+
+    function renderWeatherTime(weather) {
+      if (requestConfig.start && requestConfig.end) {
+        return `
+          <span class="time-range-line">${escapeHtml(formatLocalDateTime(requestConfig.start))} -</span>
+          <span class="time-range-line">${escapeHtml(formatLocalDateTime(requestConfig.end))}</span>
+        `;
+      }
+
+      return escapeHtml(formatLocalDateTime(weather.utc_time));
     }
 
     function formatMeasurement(measurement) {
