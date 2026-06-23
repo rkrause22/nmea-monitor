@@ -530,7 +530,8 @@
 
     for (const option of Array.from(elements.advancedForm.elements["time-mode"])) {
       option.addEventListener("change", () => {
-        syncAdvancedControls({ resetVisibleDefaults: true });
+        syncAdvancedControls({ previousMode: activeTimeMode });
+        activeTimeMode = currentTimeMode();
       });
     }
 
@@ -546,6 +547,7 @@
     let frameResizeObserver;
     let frameResizeCleanup;
     let startDateTimeEdited = false;
+    let activeTimeMode = "latest";
 
     const requestConfig = readRequestConfig();
 
@@ -657,32 +659,40 @@
 
     function syncAdvancedControls(options = {}) {
       const mode = currentTimeMode();
-      const showStart = mode === "duration" || mode === "period";
-      const showEnd = mode === "period";
-      const showSpan = mode === "latest" || mode === "duration";
+      const visibility = controlVisibilityForMode(mode);
+      const previousVisibility = options.previousMode
+        ? controlVisibilityForMode(options.previousMode)
+        : null;
 
       updateTimeModeSelection(mode);
-      elements.startGroup.hidden = !showStart;
-      elements.endGroup.hidden = !showEnd;
-      elements.spanGroup.hidden = !showSpan;
+      elements.startGroup.hidden = !visibility.start;
+      elements.endGroup.hidden = !visibility.end;
+      elements.spanGroup.hidden = !visibility.span;
 
-      if (!showStart) {
+      if (!visibility.start) {
         clearDateTime("start");
-      }
-      if (!showEnd) {
-        clearDateTime("end");
-      }
-      if (!showSpan) {
-        elements.spanSelect.value = "";
+        startDateTimeEdited = false;
+      } else if (previousVisibility && !previousVisibility.start) {
+        setDateTime("start", startForSpan(elements.spanSelect.value || DEFAULT_SPAN));
+        startDateTimeEdited = false;
       }
 
-      if (options.resetVisibleDefaults) {
-        applyModeDefaults(mode);
+      if (!visibility.end) {
+        clearDateTime("end");
+      } else if (previousVisibility && !previousVisibility.end) {
+        setDateTime("end", new Date());
+      }
+
+      if (!visibility.span) {
+        elements.spanSelect.value = "";
+      } else if (previousVisibility && !previousVisibility.span) {
+        elements.spanSelect.value = DEFAULT_SPAN;
       }
     }
 
     function resetAdvancedForm() {
       elements.advancedForm.elements["time-mode"].value = "latest";
+      activeTimeMode = "latest";
       startDateTimeEdited = false;
       clearAdvancedFields();
       applyModeDefaults("latest");
@@ -743,6 +753,7 @@
     function populateAdvancedForm(config) {
       const mode = advancedModeForConfig(config);
       elements.advancedForm.elements["time-mode"].value = mode;
+      activeTimeMode = mode;
       clearAdvancedFields();
 
       if (config.span && mode !== "period") {
@@ -793,6 +804,14 @@
 
     function currentTimeMode() {
       return elements.advancedForm.elements["time-mode"].value;
+    }
+
+    function controlVisibilityForMode(mode) {
+      return {
+        start: mode === "duration" || mode === "period",
+        end: mode === "period",
+        span: mode === "latest" || mode === "duration",
+      };
     }
 
     function updateTimeModeSelection(mode) {
