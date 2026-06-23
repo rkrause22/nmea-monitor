@@ -273,8 +273,16 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
         if count < 1:
             return json_error("count must be greater than zero", 400)
 
+        start_text = request.args.get("start")
+        end_text = request.args.get("end")
+        span_text = request.args.get("span")
+
         try:
-            records = service.find_messages(org, source, count=count)
+            start, end = apply_date_filters(start_text, end_text, span_text)
+            if start is None and end is None:
+                records = service.find_messages(org, source, count=count)
+            else:
+                records = service.find_messages(org, source, start=start, end=end)
         except ValueError as exc:
             return handle_value_error("invalid weather request", exc)
 

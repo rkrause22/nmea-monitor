@@ -221,7 +221,7 @@
         id: "map",
         label: "Map",
         frameTitle: "Weather map",
-        url: (config) => nmeaPageUrl("nmea-map.html", config),
+        url: (config) => nmeaPageUrl("nmea-map.html", config, { includeHistory: true }),
       },
       {
         id: "cam1",
@@ -247,9 +247,9 @@
 
     elements.refreshButton.addEventListener("click", () => {
       const params = new URLSearchParams();
-      params.set("org", displayForId(elements.viewSelect.value).id);
-      params.set("source", displayForId(elements.viewSelect.value).id);
-      params.set("view", displayForId(elements.viewSelect.value).id);
+      params.set("org", requestConfig.org);
+      params.set("src", requestConfig.source);
+      params.set("view", requestConfig.view);
       window.location.assign(`${window.location.pathname}?${params.toString()}`);
     });
 

@@ -228,7 +228,7 @@
         renderWeatherOnMap(weather, position, true);
         setInterval(() => {
           refreshWeather(false);
-        }, requestConfig.refreshIntervalMs);
+        }, requestConfig.rate);
       } catch (error) {
         setStatus(error.message, true);
       }
@@ -413,15 +413,37 @@
     }
 
     function weatherUrl(config) {
-      return `/nmea/weather/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}/3`;
+      const params = new URLSearchParams();
+      if (config.start) {
+        params.set("start", config.start);
+      }
+      if (config.end) {
+        params.set("end", config.end);
+      }
+      if (config.span) {
+        params.set("span", config.span);
+      }
+      const query = params.size === 0 ? "/3" : `?${params.toString()}`;
+      return `/nmea/weather/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}${query}`;
     }
 
     function readRequestConfig() {
       return {
         org: firstQueryValue("org"),
-        source: firstQueryValue("src", "source"),
-        refreshIntervalMs: readRefreshIntervalMs(),
+        source: firstQueryValue("src"),
+        span: firstQueryValue("span"),
+        start: firstQueryValue("start"),
+        end: firstQueryValue("end"),
+        rate: readRefreshIntervalMs()
       };
+    }
+
+    function readRefreshIntervalMs() {
+      const value = Number(firstQueryValue("rate"));
+      if (!Number.isFinite(value) || value <= 0) {
+        return REFRESH_INTERVAL_MS;
+      }
+      return value * 1000;
     }
 
     function firstQueryValue(...keys) {
@@ -431,15 +453,7 @@
           return value.trim();
         }
       }
-      return "";
-    }
-
-    function readRefreshIntervalMs() {
-      const value = Number(PAGE_QUERY.get("rate"));
-      if (!Number.isFinite(value) || value <= 0) {
-        return REFRESH_INTERVAL_MS;
-      }
-      return value * 1000;
+      return None;
     }
 
     function weatherPosition(weather) {

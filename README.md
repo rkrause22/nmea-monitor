@@ -60,7 +60,7 @@ Endpoints:
 * `GET /nmea/history/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
   Returns plot-ready wind history for the given `org/source` as JSON, optionally filtered by a date/time range and/or span. `start` with `span` creates a window beginning at `start`; `end` with `span` creates a window ending at `end`; and `span` alone creates a trailing window ending at the current time. When both `start` and `end` are supplied, `span` is ignored. The response includes `org`, `source`, the supplied filter values, and a `samples` array ordered from oldest to newest.
 * `GET /nmea/weather/<org>/<source>`
-  Returns a weather-oriented summary view derived from the most recent stored message(s) for the `org/source`.
+  Returns a weather-oriented summary view derived from the most recent stored message(s) for the `org/source`. This route also accepts `start`, `end`, and `span` query parameters like the history endpoint; when those filters are supplied, the weather summary is built from the matching messages instead of the default latest message.
 * `GET /nmea/weather/<org>/<source>/<count>`
   Returns a weather-oriented summary view derived from the most recent `count` stored messages for the `org/source`.
 * `GET /<filename>.html`
