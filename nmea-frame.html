@@ -536,7 +536,7 @@
     }
 
     elements.spanSelect.addEventListener("change", () => {
-      if (currentTimeMode() === "duration" && !startDateTimeEdited) {
+      if (currentTimeMode() === "duration" && !requestConfig.start && !startDateTimeEdited) {
         setDateTime("start", startForSpan(elements.spanSelect.value || DEFAULT_SPAN));
       }
     });
@@ -673,20 +673,20 @@
         clearDateTime("start");
         startDateTimeEdited = false;
       } else if (previousVisibility && !previousVisibility.start) {
-        setDateTime("start", startForSpan(elements.spanSelect.value || DEFAULT_SPAN));
+        defaultStartControl();
         startDateTimeEdited = false;
       }
 
       if (!visibility.end) {
         clearDateTime("end");
       } else if (previousVisibility && !previousVisibility.end) {
-        setDateTime("end", new Date());
+        defaultEndControl();
       }
 
       if (!visibility.span) {
         elements.spanSelect.value = "";
       } else if (previousVisibility && !previousVisibility.span) {
-        elements.spanSelect.value = DEFAULT_SPAN;
+        defaultSpanControl();
       }
     }
 
@@ -717,7 +717,7 @@
       const now = new Date();
       if (mode === "latest") {
         startDateTimeEdited = false;
-        elements.spanSelect.value = DEFAULT_SPAN;
+        defaultSpanControl();
         clearDateTime("start");
         clearDateTime("end");
         return;
@@ -725,16 +725,16 @@
 
       if (mode === "duration") {
         startDateTimeEdited = false;
-        elements.spanSelect.value = DEFAULT_SPAN;
-        setDateTime("start", startForSpan(elements.spanSelect.value));
+        defaultSpanControl();
+        defaultStartControl();
         clearDateTime("end");
         return;
       }
 
       if (mode === "period") {
         startDateTimeEdited = false;
-        setDateTime("start", new Date(now.getTime() - 30 * 60 * 1000));
-        setDateTime("end", now);
+        defaultStartControl(new Date(now.getTime() - 30 * 60 * 1000));
+        defaultEndControl(now);
         elements.spanSelect.value = "";
       }
     }
@@ -812,6 +812,26 @@
         end: mode === "period",
         span: mode === "latest" || mode === "duration",
       };
+    }
+
+    function defaultStartControl(fallback = startForSpan(elements.spanSelect.value || DEFAULT_SPAN)) {
+      if (requestConfig.start) {
+        setDateTimeFromText("start", requestConfig.start);
+      } else {
+        setDateTime("start", fallback);
+      }
+    }
+
+    function defaultEndControl(fallback = new Date()) {
+      if (requestConfig.end) {
+        setDateTimeFromText("end", requestConfig.end);
+      } else {
+        setDateTime("end", fallback);
+      }
+    }
+
+    function defaultSpanControl() {
+      elements.spanSelect.value = requestConfig.span || DEFAULT_SPAN;
     }
 
     function updateTimeModeSelection(mode) {
