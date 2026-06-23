@@ -29,8 +29,7 @@
     .status {
       position: absolute;
       z-index: 1;
-      top: 52px;
-      left: 2px;
+      top: 55;
       max-width: min(420px, calc(100vw - 24px));
       padding: 10px 12px;
       border-radius: 6px;
@@ -626,13 +625,13 @@
     }
 
     function renderWeatherTime(weather) {
-      if (weather.utc_end_time) {
+      if (weather.utc_start) {
         return `
-          ${escapeHtml(formatLocalDateTime(weather.utc_time))} -<br/> ${escapeHtml(formatLocalDateTime(weather.utc_end_time))}
+          ${escapeHtml(formatLocalDateTime(weather.utc_start))} -<br/> ${escapeHtml(formatLocalDateTime(weather.utc_end))}
         `;
       }
 
-      return escapeHtml(formatLocalDateTime(weather.utc_time));
+      return escapeHtml(formatLocalDateTime(firstValue(weather.utc_end, weather.utc_time)));
     }
 
     function formatMeasurement(measurement) {

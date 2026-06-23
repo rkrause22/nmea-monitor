@@ -210,24 +210,29 @@
   <script>
     const PAGE_QUERY = new URLSearchParams(window.location.search);
     const DEFAULT_VIEW = "plot";
+    const FRAME_QUERY_FIELDS = ["org", "src", "rate", "span", "start", "end", "view"];
+    const RESET_QUERY_FIELDS = ["org", "src", "view"];
+    const NMEA_DISPLAY_QUERY_FIELDS = ["org", "src", "rate", "span", "start", "end"];
     const DISPLAYS = [
       {
         id: "plot",
         label: "Plot",
         frameTitle: "Wind plot",
-        url: (config) => nmeaPageUrl("nmea-plot.html", config, { includeHistory: true }),
+        page: "nmea-plot.html",
+        queryFields: NMEA_DISPLAY_QUERY_FIELDS,
       },
       {
         id: "map",
         label: "Map",
         frameTitle: "Weather map",
-        url: (config) => nmeaPageUrl("nmea-map.html", config, { includeHistory: true }),
+        page: "nmea-map.html",
+        queryFields: NMEA_DISPLAY_QUERY_FIELDS,
       },
       {
         id: "cam1",
         label: "Cam1",
         frameTitle: "Camera 1",
-        url: () => "https://wsccam.arcsite.ca/cam1/",
+        href: "https://wsccam.arcsite.ca/cam1/",
       },
     ];
 
@@ -242,36 +247,16 @@
     populateDisplayOptions();
 
     elements.viewSelect.addEventListener("change", () => {
-      window.location.href = frameUrl(elements.viewSelect.value, requestConfig);
+      window.location.href = frameUrl({ ...requestConfig, view: elements.viewSelect.value });
     });
 
     elements.refreshButton.addEventListener("click", () => {
-      const params = new URLSearchParams();
-      params.set("org", requestConfig.org);
-      params.set("src", requestConfig.source);
-      params.set("view", requestConfig.view);
-      window.location.assign(`${window.location.pathname}?${params.toString()}`);
+      window.location.assign(frameUrl(requestConfig, RESET_QUERY_FIELDS));
     });
 
     const requestConfig = readRequestConfig();
 
-    if (!requestConfig.org || !requestConfig.source) {
-      elements.subtitle.textContent = "Query string required";
-      elements.message.classList.add("show");
-      elements.frame.style.display = "none";
-      selectDisplay(requestConfig.view);
-    } else {
-      const activeDisplay = displayForId(requestConfig.view);
-      const frameTitle = `${requestConfig.org} ${requestConfig.source}`;
-      document.title = `Weather Conditions @ ${frameTitle}`;
-      elements.subtitle.textContent = frameTitle;
-      elements.message.classList.remove("show");
-      elements.frame.style.display = "block";
-      elements.frame.addEventListener("load", startFrameResizer);
-      selectDisplay(activeDisplay.id);
-      elements.frame.title = activeDisplay.frameTitle;
-      elements.frame.src = activeDisplay.url(requestConfig);
-    }
+    renderFrame(requestConfig);
 
     let frameResizeObserver;
     let frameResizeCleanup;
@@ -345,55 +330,56 @@
       return DISPLAYS.find((display) => display.id === view) || DISPLAYS.find((display) => display.id === DEFAULT_VIEW);
     }
 
-    function frameUrl(view, config) {
-      const params = new URLSearchParams();
-      if (config.org) {
-        params.set("org", config.org);
+    function renderFrame(config) {
+      if (!config.org || !config.src) {
+        elements.subtitle.textContent = "Query string required";
+        elements.message.classList.add("show");
+        elements.frame.style.display = "none";
+        selectDisplay(config.view);
+        return;
       }
-      if (config.source) {
-        params.set("src", config.source);
-      }
-      if (config.rate) {
-        params.set("rate", config.rate);
-      }
-      if (config.span) {
-        params.set("span", config.span);
-      }
-      if (config.start) {
-        params.set("start", config.start);
-      }
-      if (config.end) {
-        params.set("end", config.end);
-      }
-      params.set("view", view);
-      return `/nmea-frame.html?${params.toString()}`;
+
+      const activeDisplay = displayForId(config.view);
+      const frameTitle = `${config.org} ${config.src}`;
+      document.title = `Weather Conditions @ ${frameTitle}`;
+      elements.subtitle.textContent = frameTitle;
+      elements.message.classList.remove("show");
+      elements.frame.style.display = "block";
+      elements.frame.addEventListener("load", startFrameResizer);
+      selectDisplay(activeDisplay.id);
+      elements.frame.title = activeDisplay.frameTitle;
+      elements.frame.src = displayUrl(activeDisplay, config);
     }
 
-    function nmeaPageUrl(page, config, options = {}) {
+    function frameUrl(config, fields = FRAME_QUERY_FIELDS) {
+      return `${window.location.pathname}?${configToParams(config, fields).toString()}`;
+    }
+
+    function displayUrl(display, config) {
+      if (display.href) {
+        return display.href;
+      }
+
+      const params = configToParams(config, display.queryFields || []);
+      const query = params.toString();
+      return `/${display.page}${query ? `?${query}` : ""}`;
+    }
+
+    function configToParams(config, fields) {
       const params = new URLSearchParams();
-      params.set("org", config.org);
-      params.set("src", config.source);
-      if (config.rate) {
-        params.set("rate", config.rate);
-      }
-      if (options.includeHistory) {
-        if (config.span) {
-          params.set("span", config.span);
-        }
-        if (config.start) {
-          params.set("start", config.start);
-        }
-        if (config.end) {
-          params.set("end", config.end);
+      for (const field of fields) {
+        const value = config[field];
+        if (value) {
+          params.set(field, value);
         }
       }
-      return `/${page}?${params.toString()}`;
+      return params;
     }
 
     function readRequestConfig() {
       return {
         org: firstQueryValue("org"),
-        source: firstQueryValue("src", "source"),
+        src: firstQueryValue("src", "source"),
         rate: firstQueryValue("rate"),
         span: firstQueryValue("span"),
         start: firstQueryValue("start"),

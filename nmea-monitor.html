@@ -213,7 +213,7 @@
 
     function renderWeather(weather) {
       setPageTitle(weather);
-      elements.localDateTime.textContent = formatLocalDateTime(firstValue(weather.local_time, weather.utc_time, weather.datetime, weather.date_time));
+      elements.localDateTime.textContent = formatWeatherTime(weather);
       elements.temperature.textContent = formatTemperature(firstValue(weather.temperature, weather.temp));
       elements.wind.innerHTML = formatWind(
         firstValue(weather.wind_strength, weather.wind_speed, weather.windSpeed),
@@ -262,6 +262,15 @@
 
     function firstValue(...values) {
       return values.find((value) => value !== null && value !== undefined && value !== "");
+    }
+
+    function formatWeatherTime(weather) {
+      if (weather.utc_start && weather.utc_end) {
+        return `${formatLocalDateTime(weather.utc_start)} - ${formatLocalDateTime(weather.utc_end)}`;
+      }
+      return formatLocalDateTime(
+        firstValue(weather.local_time, weather.utc_end, weather.utc_time, weather.datetime, weather.date_time),
+      );
     }
 
     function formatLocalDateTime(value) {
