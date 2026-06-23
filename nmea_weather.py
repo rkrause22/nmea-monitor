@@ -109,9 +109,13 @@ def build_weather_summary(
         },
         "windward": windward,
         "startpin": startpin,
-    }
+    }    
+    
     if utc_end_time - utc_time > timedelta(minutes=1):
         summary["utc_end_time"] = format_utc_datetime(utc_end_time)
+    else: 
+        summary["utc_time"] = format_utc_datetime(utc_end_time)
+
     return summary
 
 
