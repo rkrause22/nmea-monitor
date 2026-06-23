@@ -289,7 +289,9 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
         if not records:
             return jsonify({"error": "no records found"}), 404
 
-        return jsonify(build_weather_summary(org, source, records, log_exception))
+        return jsonify(
+            build_weather_summary(org,source, records, log_exception)
+        )
 
     return app
 

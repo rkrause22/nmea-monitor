@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from repository_store import MessageRecord
 from common_helpers import (
     average_direction_degrees,
@@ -57,6 +59,7 @@ def build_weather_summary(
 ) -> dict[str, object]:
     frame = FrameAggregator()
     utc_time = records[-1].utc
+    utc_end_time = records[0].utc
 
     for record in records:
         for raw_sentence in record.sentences:
@@ -85,7 +88,7 @@ def build_weather_summary(
     )
     startpin = weather_startpin_position(latitude, longitude, wind_direction, 100.0)
 
-    return {
+    summary = {
         "org": org,
         "source": source,
         "utc_time": format_utc_datetime(utc_time),
@@ -107,6 +110,9 @@ def build_weather_summary(
         "windward": windward,
         "startpin": startpin,
     }
+    if utc_end_time - utc_time > timedelta(minutes=1):
+        summary["utc_end_time"] = format_utc_datetime(utc_end_time)
+    return summary
 
 
 def weather_position(frame: FrameAggregator) -> tuple[float | None, float | None]:

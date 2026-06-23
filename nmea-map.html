@@ -626,10 +626,9 @@
     }
 
     function renderWeatherTime(weather) {
-      if (requestConfig.start && requestConfig.end) {
+      if (weather.utc_end_time) {
         return `
-          <span class="time-range-line">${escapeHtml(formatLocalDateTime(requestConfig.start))} -</span>
-          <span class="time-range-line">${escapeHtml(formatLocalDateTime(requestConfig.end))}</span>
+          { escapeHtml(formatLocalDateTime(weather.utc_time)) - escapeHtml(formatLocalDateTime(weather.utc_end_time))}
         `;
       }
 
