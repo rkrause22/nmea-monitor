@@ -395,9 +395,12 @@ def handle_value_error(
     error_text = str(exc)
     log_exception(message, exc)
     if error_text == "registration not found":
-        return json_error("access denied" if add_missing_registration else "registration not found", 401 if add_missing_registration else 404)
+        return json_error(
+            "access denied" if add_missing_registration else "registration not found",
+            401 if add_missing_registration else 404,
+        )
     if error_text == "access denied":
-        return json_error("access denied", 402)
+        return json_error("access denied", 401)
     return json_error(error_text, 400)
 
 

@@ -40,11 +40,11 @@ Endpoints:
 * `GET /nmea/registrations/<org>`
   Returns the registration for the given organization. This endpoint does not require authentication.
 * `DELETE /nmea/registrations/<org>`
-  Deletes the specified registration and all stored messages for that organization. Returns `volume_deleted`, which is the number of stored daily files removed. Requires the admin bearer token.
+  Deletes the specified registration and all stored messages for that organization. Returns `files_deleted`, which is the number of stored daily files removed. Requires the admin bearer token.
 * `DELETE /nmea/purge/<org>/<source>`
-  Purges stored messages for the source using the registered retention settings for that organization. Returns `volume_deleted`, which is the number of stored daily files removed. Requires the organization bearer token.
+  Purges stored messages for the source using the registered retention settings for that organization. Returns `files_deleted`, which is the number of stored daily files removed. Requires the organization bearer token.
 * `DELETE /nmea/purge/<org>/<source>/<what>`
-  Purges stored messages for the source using an explicit keep rule or override value, rather than the default registration settings. If `what` is an integer, it is treated as the number of daily files to keep. Otherwise it is treated as a timespan such as `30-days` or `1-month`. Returns `volume_deleted`, which is the number of stored daily files removed. Requires the organization bearer token.
+  Purges stored messages for the source using an explicit keep rule or override value, rather than the default registration settings. If `what` is an integer, it is treated as the number of daily files to keep. Otherwise it is treated as a timespan such as `30-days` or `1-month`. Returns `files_deleted`, which is the number of stored daily files removed. Requires the organization bearer token.
 * `GET /nmea/last/<org>/<source>`
   Returns the latest stored message for the given `org/source` as plain text.
 * `GET /nmea/last/<org>/<source>/<what>`
@@ -76,7 +76,7 @@ Authorization notes:
 * creating the first `admin` registration is a bootstrap case: the bearer token must match the posted `auth`
 * later registrations require the `admin` bearer token
 * adding messages and purging data require the bearer token for the target organization
-* authorization failures return HTTP `402` with `{ "error": "access denied" }`
+* authorization failures return HTTP `401` with `{ "error": "access denied" }`
 
 ## How to install on Raspberry PI
 
