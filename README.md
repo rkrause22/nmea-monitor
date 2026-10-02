@@ -34,11 +34,11 @@ Endpoints:
 * `POST /nmea/add/<org>/<source>`
   Accepts a JSON body containing `start` and `sentences`, and appends the stored message for that `org/source` stream. Requires a bearer token matching the organization registration.
 * `POST /nmea/registrations`
-  Creates a new organization registration with its authentication token and retention settings. Creating the first `admin` registration is a bootstrap case; later registrations require the admin bearer token.
+  Creates or updates an organization registration with its authentication token, retention settings, Google Maps key, and Weather Underground PWS credentials. Creating the first `admin` registration is a bootstrap case; later registration creates and updates require the admin bearer token. New registrations require `org` and `auth`; existing registrations can be partially updated by posting `org` plus only the fields to change. Supported mutable fields are `auth`, `span`, `limit`, `gkey`, `pwsid`, and `pwskey`.
 * `GET /nmea/registrations`
-  Returns all registrations, including each organization's retention span and retention limit. Requires the admin bearer token.
+  Returns all registrations, including each organization's retention span, retention limit, Google Maps key, PWS station ID, and PWS key. Requires the admin bearer token.
 * `GET /nmea/registrations/<org>`
-  Returns the registration for the given organization. This endpoint does not require authentication.
+  Returns the registration for the given organization, excluding secret values such as the PWS key. This endpoint does not require authentication.
 * `DELETE /nmea/registrations/<org>`
   Deletes the specified registration and all stored messages for that organization. Returns `files_deleted`, which is the number of stored daily files removed. Requires the admin bearer token.
 * `DELETE /nmea/purge/<org>/<source>`

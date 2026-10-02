@@ -122,6 +122,32 @@ class RepositoryService:
             self._require_admin_access(auth)
         return self.store.add_registration(registration)
 
+    def save_registration(
+        self,
+        auth: str,
+        org: str,
+        fields: dict[str, object],
+    ) -> bool:
+        if not auth:
+            raise ValueError("access denied")
+
+        existing_registration = self.store.get_registration(org)
+        admin_registration = self.store.get_registration("admin")
+        if existing_registration is None:
+            registration = self._registration_from_fields(org, fields)
+            if admin_registration is None:
+                if registration.org.lower() != "admin":
+                    raise ValueError("access denied")
+                if auth != registration.auth:
+                    raise ValueError("access denied")
+            else:
+                self._require_admin_access(auth)
+            return self.store.add_registration(registration)
+
+        self._require_admin_access(auth)
+        self.store.update_registration(org, fields)
+        return False
+
     def delete_registration(self, auth: str, org: str) -> int:
         self._require_admin_access(auth)
         return self.store.delete_registration(org)
@@ -140,6 +166,47 @@ class RepositoryService:
     ) -> list[RegistrationRecord]:
         self._require_admin_access(auth)
         return self.store.get_registrations(org)
+
+    def _registration_from_fields(
+        self,
+        org: str,
+        fields: dict[str, object],
+    ) -> RegistrationRecord:
+        auth = fields.get("auth")
+        if not isinstance(auth, str):
+            raise ValueError("auth is required for new registrations")
+
+        return RegistrationRecord(
+            org=org,
+            auth=auth,
+            span=self._string_field(fields, "span", "1 year"),
+            limit=self._integer_field(fields, "limit", 366),
+            gkey=self._string_field(fields, "gkey", ""),
+            pwsid=self._string_field(fields, "pwsid", ""),
+            pwskey=self._string_field(fields, "pwskey", ""),
+        )
+
+    def _string_field(
+        self,
+        fields: dict[str, object],
+        name: str,
+        default: str,
+    ) -> str:
+        value = fields.get(name, default)
+        if not isinstance(value, str):
+            raise ValueError(f"{name} must be a string")
+        return value
+
+    def _integer_field(
+        self,
+        fields: dict[str, object],
+        name: str,
+        default: int,
+    ) -> int:
+        value = fields.get(name, default)
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError(f"{name} must be an integer")
+        return value
 
     def _require_admin_access(self, auth: str) -> None:
         admin_registration = self.store.get_registration("admin")

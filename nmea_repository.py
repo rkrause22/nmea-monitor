@@ -73,14 +73,14 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
             return json_error("request body must be a JSON object", 400)
 
         try:
-            registration = registration_record_from_payload(payload)
-            created = service.add_registration(auth, registration)
+            org, fields = registration_fields_from_payload(payload)
+            created = service.save_registration(auth, org, fields)
         except ValueError as exc:
             return handle_value_error("invalid registration payload", exc)
 
-        if not created:
-            return json_error("registration already exists", 409)
-        return jsonify({"status": "created"}), 201
+        if created:
+            return jsonify({"status": "created"}), 201
+        return jsonify({"status": "updated"}), 200
 
     @app.get("/nmea/registrations")
     def get_registrations() -> Response:
@@ -96,12 +96,7 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
 
         return jsonify(
             [
-                {
-                    "org": registration.org,
-                    "span": registration.span,
-                    "limit": registration.limit,
-                    "gkey": registration.gkey,
-                }
+                registration_response(registration, include_secrets=True)
                 for registration in registrations
             ]
         )
@@ -116,14 +111,7 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
         if registration is None:
             return json_error("registration not found", 404)
 
-        return jsonify(
-            {
-                "org": registration.org,
-                "span": registration.span,
-                "limit": registration.limit,
-                "gkey": registration.gkey,
-            }
-        )
+        return jsonify(registration_response(registration, include_secrets=False))
 
     @app.delete("/nmea/registrations/<org>")
     def delete_registration(org: str) -> tuple[Response, int]:
@@ -333,57 +321,71 @@ def message_record_from_payload(payload: dict[str, object]) -> MessageRecord:
     )
 
 
-def registration_record_from_payload(payload: dict[str, object]) -> RegistrationRecord:
+def registration_fields_from_payload(
+    payload: dict[str, object],
+) -> tuple[str, dict[str, object]]:
     org_value = payload.get("org")
     if not isinstance(org_value, str) or not org_value.strip():
         raise ValueError("org must be a non-empty string")
 
-    auth_value = payload.get("auth")
-    if not isinstance(auth_value, str) or len(auth_value) < 8:
-        raise ValueError("auth must be a string with length 8 or longer")
+    fields: dict[str, object] = {}
+    if "auth" in payload:
+        auth_value = payload.get("auth")
+        if not isinstance(auth_value, str) or len(auth_value) < 8:
+            raise ValueError("auth must be a string with length 8 or longer")
+        fields["auth"] = auth_value
 
-    span_value = payload.get("span")
-    if span_value is None:
-        span = "1 year"
-    elif not isinstance(span_value, str) or not span_value.strip():
-        raise ValueError("span must be a non-empty string when provided")
-    else:
+    if "span" in payload:
+        span_value = payload.get("span")
+        if not isinstance(span_value, str) or not span_value.strip():
+            raise ValueError("span must be a non-empty string when provided")
         parse_timespan(span_value)
-        span = span_value.strip()
+        fields["span"] = span_value.strip()
 
-    limit_value = payload.get("limit")
-    if limit_value is None:
-        limit = 366
-    elif isinstance(limit_value, bool):
-        raise ValueError("limit must be an integer when provided")
-    elif isinstance(limit_value, int):
-        limit = limit_value
-    elif isinstance(limit_value, str):
-        try:
-            limit = int(limit_value.strip())
-        except ValueError as exc:
-            raise ValueError("limit must be an integer when provided") from exc
-    else:
-        raise ValueError("limit must be an integer when provided")
+    if "limit" in payload:
+        limit_value = payload.get("limit")
+        if isinstance(limit_value, bool):
+            raise ValueError("limit must be an integer when provided")
+        if isinstance(limit_value, int):
+            limit = limit_value
+        elif isinstance(limit_value, str):
+            try:
+                limit = int(limit_value.strip())
+            except ValueError as exc:
+                raise ValueError("limit must be an integer when provided") from exc
+        else:
+            raise ValueError("limit must be an integer when provided")
 
-    if limit < 1:
-        raise ValueError("limit must be greater than zero")
+        if limit < 1:
+            raise ValueError("limit must be greater than zero")
+        fields["limit"] = limit
 
-    gkey_value = payload.get("gkey")
-    if gkey_value is None:
-        gkey = ""
-    elif not isinstance(gkey_value, str):
-        raise ValueError("gkey must be a string when provided")
-    else:
-        gkey = gkey_value.strip()
+    for field_name in ("gkey", "pwsid", "pwskey"):
+        if field_name not in payload:
+            continue
+        field_value = payload.get(field_name)
+        if not isinstance(field_value, str):
+            raise ValueError(f"{field_name} must be a string when provided")
+        fields[field_name] = field_value.strip()
 
-    return RegistrationRecord(
-        org=org_value.strip(),
-        auth=auth_value,
-        span=span,
-        limit=limit,
-        gkey=gkey,
-    )
+    return org_value.strip(), fields
+
+
+def registration_response(
+    registration: RegistrationRecord,
+    *,
+    include_secrets: bool,
+) -> dict[str, object]:
+    payload = {
+        "org": registration.org,
+        "span": registration.span,
+        "limit": registration.limit,
+        "gkey": registration.gkey,
+        "pwsid": registration.pwsid,
+    }
+    if include_secrets:
+        payload["pwskey"] = registration.pwskey
+    return payload
 
 
 def handle_value_error(

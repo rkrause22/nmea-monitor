@@ -31,6 +31,8 @@ class RegistrationRecord:
     span: str
     limit: int
     gkey: str = ""
+    pwsid: str = ""
+    pwskey: str = ""
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,13 @@ class RepositoryStore(Protocol):
         registration: RegistrationRecord,
     ) -> bool:
         """Add one registration and return True when it did not already exist."""
+
+    def update_registration(
+        self,
+        org: str,
+        fields: dict[str, object],
+    ) -> None:
+        """Update supplied fields for one registration."""
 
     def authenticate(self, org: str, auth: str) -> bool:
         """Return True when the supplied org-level bearer token is valid."""

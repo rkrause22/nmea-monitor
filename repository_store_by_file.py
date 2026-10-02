@@ -227,12 +227,14 @@ class FileStore(RepositoryStore):
             span=registration.span,
             limit=registration.limit,
             gkey=registration.gkey,
+            pwsid=registration.pwsid,
+            pwskey=registration.pwskey,
         )
         if len(registration.auth) < 8:
             raise ValueError("registration auth must be at least 8 characters")
         parse_timespan(registration.span)
-        if registration.limit < 0:
-            raise ValueError("registration limit must be zero or greater")
+        if registration.limit < 1:
+            raise ValueError("registration limit must be greater than zero")
 
         registrations = self._load_registrations()
         registration_payload = self._get_registration_payload(
@@ -246,6 +248,50 @@ class FileStore(RepositoryStore):
             return False
         self._save_registrations(registrations)
         return True
+
+    def update_registration(
+        self,
+        org: str,
+        fields: dict[str, object],
+    ) -> None:
+        org = self._normalize_org_name(org)
+        registrations = self._load_registrations()
+        registration_payload = self._get_registration_payload(registrations, org)
+        if registration_payload is None:
+            raise ValueError("registration not found")
+
+        auth = fields.get("auth")
+        if auth is not None:
+            if not isinstance(auth, str) or len(auth) < 8:
+                raise ValueError("registration auth must be at least 8 characters")
+            salt = self._new_auth_salt()
+            registration_payload["auth_hash"] = self._hash_auth_token(auth, salt)
+            registration_payload["auth_salt"] = salt
+
+        span = fields.get("span")
+        if span is not None:
+            if not isinstance(span, str):
+                raise ValueError("registration span must be a string")
+            parse_timespan(span)
+            registration_payload["span"] = span
+
+        limit = fields.get("limit")
+        if limit is not None:
+            if not isinstance(limit, int) or isinstance(limit, bool):
+                raise ValueError("registration limit must be an integer")
+            if limit < 1:
+                raise ValueError("registration limit must be greater than zero")
+            registration_payload["limit"] = limit
+
+        for field_name in ("gkey", "pwsid", "pwskey"):
+            field_value = fields.get(field_name)
+            if field_value is None:
+                continue
+            if not isinstance(field_value, str):
+                raise ValueError(f"registration {field_name} must be a string")
+            registration_payload[field_name] = field_value
+
+        self._save_registrations(registrations)
 
     def authenticate(self, org: str, auth: str) -> bool:
         org = self._normalize_org_name(org)
@@ -558,6 +604,8 @@ class FileStore(RepositoryStore):
         span = payload.get("span")
         limit = payload.get("limit")
         gkey = payload.get("gkey")
+        pwsid = payload.get("pwsid")
+        pwskey = payload.get("pwskey")
         if not isinstance(span, str):
             return None
         if not isinstance(limit, int) or isinstance(limit, bool):
@@ -568,6 +616,8 @@ class FileStore(RepositoryStore):
             span=span,
             limit=limit,
             gkey=gkey if isinstance(gkey, str) else "",
+            pwsid=pwsid if isinstance(pwsid, str) else "",
+            pwskey=pwskey if isinstance(pwskey, str) else "",
         )
 
     def _cutoff_date_for_span(self, span_text: str) -> date:
@@ -592,6 +642,8 @@ class FileStore(RepositoryStore):
             "span": registration.span,
             "limit": registration.limit,
             "gkey": registration.gkey,
+            "pwsid": registration.pwsid,
+            "pwskey": registration.pwskey,
         }
 
     def _get_registration_payload(
