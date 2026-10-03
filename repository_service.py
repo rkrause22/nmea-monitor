@@ -159,6 +159,13 @@ class RepositoryService:
         self._require_admin_access(auth)
         return self.store.get_registration(org)
 
+    def get_org_registration(self, auth: str, org: str) -> RegistrationRecord:
+        self._require_org_access(org, auth)
+        registration = self.store.get_registration(org)
+        if registration is None:
+            raise ValueError("registration not found")
+        return registration
+
     def get_registrations(
         self,
         auth: str,

@@ -63,6 +63,8 @@ Endpoints:
   Returns a weather-oriented summary view derived from the most recent stored message(s) for the `org/source`. This route also accepts `start`, `end`, and `span` query parameters like the history endpoint; when those filters are supplied, the weather summary is built from the matching messages instead of the default latest message. Weather JSON always includes `utc_end`, and includes `utc_start` only when the first and last ZDA times differ by more than one minute.
 * `GET /nmea/weather/<org>/<source>/<count>`
   Returns a weather-oriented summary view derived from the most recent `count` stored messages for the `org/source`. This count-based form also uses `utc_end` as its primary timestamp, with optional `utc_start` when the selected records span more than one minute.
+* `GET /nmea/pws/<org>/<source>`
+  Builds a 10-minute weather window from the latest stored message time, divides it into five equal two-minute segments, and uploads the latest segment's current conditions plus the 10-minute gust to Weather Underground using the PWS Upload Protocol. Requires the organization bearer token and registration fields `pwsid` and `pwskey`. The upload sends `winddir`, `windspeedmph`, `windgustmph`, `windgustdir`, `tempf`, `baromin`, `windspdmph_avg2m`, `winddir_avg2m`, `windgustmph_10m`, and `windgustdir_10m` when the source data can provide them.
 * `GET /<filename>.html`
   Serves a static HTML file from the repository directory.
 
@@ -76,6 +78,7 @@ Authorization notes:
 * creating the first `admin` registration is a bootstrap case: the bearer token must match the posted `auth`
 * later registrations require the `admin` bearer token
 * adding messages and purging data require the bearer token for the target organization
+* uploading PWS observations requires the bearer token for the target organization
 * authorization failures return HTTP `401` with `{ "error": "access denied" }`
 
 ## How to install on Raspberry PI

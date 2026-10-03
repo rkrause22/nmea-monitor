@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 
@@ -19,7 +19,17 @@ from common_helpers import (
     parse_utc_datetime,
 )
 from nmea_history import build_history_summary
+from nmea_pws import (
+    build_pws_upload_fields,
+    public_pws_fields,
+    upload_pws_observation,
+)
 from nmea_weather import build_weather_summary
+from nmea_weather_window import (
+    build_weather_window_summary,
+    weather_period_to_dict,
+    weather_samples_from_records,
+)
 from repository_store_by_file import FileStore
 from repository_service import RepositoryService
 from repository_store import MessageRecord, RegistrationRecord
@@ -33,7 +43,10 @@ DEFAULT_DATA_ROOT = Path(
 log_exception = partial(write_log_exception, PROGRAM_NAME, __file__)
 
 
-def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
+def create_app(
+    data_root: Path = DEFAULT_DATA_ROOT,
+    pws_uploader=upload_pws_observation,
+) -> Flask:
     app = Flask(__name__)
     data_root.mkdir(parents=True, exist_ok=True)
     service = RepositoryService(FileStore(data_root))
@@ -282,6 +295,67 @@ def create_app(data_root: Path = DEFAULT_DATA_ROOT) -> Flask:
 
         return jsonify(
             build_weather_summary(org,source, records, log_exception)
+        )
+
+    @app.get("/nmea/pws/<org>/<source>")
+    def upload_nmea_pws(org: str, source: str) -> tuple[Response, int]:
+        try:
+            auth = require_bearer_token(request)
+        except ValueError as exc:
+            return handle_value_error("invalid pws authorization", exc)
+
+        try:
+            registration = service.get_org_registration(auth, org)
+            if not registration.pwsid or not registration.pwskey:
+                raise ValueError("registration does not include PWS credentials")
+
+            latest_records = service.find_messages(org, source, count=1)
+            if not latest_records:
+                return jsonify({"error": "no records found"}), 404
+
+            end = latest_records[-1].utc
+            start = end - timedelta(minutes=10)
+            records = service.find_messages(
+                org,
+                source,
+                start=start,
+                end=end + timedelta(microseconds=1),
+            )
+            samples = weather_samples_from_records(records, log_exception)
+            if not samples:
+                return jsonify({"error": "no weather samples found"}), 404
+
+            summary = build_weather_window_summary(
+                samples,
+                start=start,
+                end=end,
+                segment_count=5,
+            )
+            fields = build_pws_upload_fields(
+                registration.pwsid,
+                registration.pwskey,
+                summary,
+            )
+            result = pws_uploader(fields)
+        except ValueError as exc:
+            return handle_value_error("invalid pws request", exc, add_missing_registration=True)
+        except RuntimeError as exc:
+            log_exception("pws upload failed", exc)
+            return json_error(str(exc), 502)
+
+        return (
+            jsonify(
+                {
+                    "status": "uploaded",
+                    "org": org,
+                    "source": source,
+                    "fields": public_pws_fields(fields),
+                    "overall": weather_period_to_dict(summary.overall),
+                    "latest_period": weather_period_to_dict(summary.segments[-1]),
+                    "response": result.response_text,
+                }
+            ),
+            200,
         )
 
     return app
