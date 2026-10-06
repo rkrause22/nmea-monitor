@@ -159,8 +159,8 @@ server {
 * `python3 nmea_filter.py -u http://127.0.0.1:8080/nmea/add/WSC/Barge -a MyApiKey -s 3 -x 10`
 * `deactivate`
 
-### Create nmea_repository.service
-* `sudo nano /etc/systemd/system/nmea_repository.service`
+### Create nmea-repository.service
+* `sudo nano /etc/systemd/system/nmea-repository.service`
 ```text
 [Unit]
 Description=Gunicorn instance to serve the nmea_repository App
@@ -179,11 +179,11 @@ Restart=always
 WantedBy=multi-user.target
 ```
 * `sudo systemctl daemon-reload`
-* `sudo systemctl start nmea_repository.service`
-* `sudo systemctl enable nmea_repository.service`
+* `sudo systemctl start nmea-repository.service`
+* `sudo systemctl enable nmea-repository.service`
 
-### Create nmea_filter.service
-* `sudo nano /etc/systemd/system/nmea_filter.service`
+### Create nmea-filter.service
+* `sudo nano /etc/systemd/system/nmea-filter.service`
 ```text
 [Unit]
 Description=Service to run nmea_filter python script
@@ -211,8 +211,51 @@ WantedBy=multi-user.target
 -x 10
 ```
 * `sudo systemctl daemon-reload`
-* `sudo systemctl start nmea_filter.service`
-* `sudo systemctl enable nmea_filter.service`
+* `sudo systemctl start nmea-filter.service`
+* `sudo systemctl enable nmea-filter.service`
+
+### Create nmea-pws.service and nmea-pws.timer
+* Store the organization bearer token outside the unit file:
+```text
+sudo nano /var/www/python/nmea/nmea_pws.env
+```
+```text
+NMEA_PWS_URL=http://127.0.0.1:8000/nmea/pws/WSC/Barge
+NMEA_PWS_AUTH=MyApiKey
+```
+* Restrict access to the token file:
+```text
+sudo chown pi:www-data /var/www/python/nmea/nmea_pws.env
+sudo chmod 640 /var/www/python/nmea/nmea_pws.env
+```
+* `sudo nano /etc/systemd/system/nmea-pws.service`
+```text
+[Unit]
+Description=Upload NMEA weather to Weather Underground PWS
+After=nmea-repository.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/var/www/python/nmea/nmea_pws.env
+ExecStart=/usr/bin/curl --fail --silent --show-error --max-time 60 -H "Authorization: Bearer ${NMEA_PWS_AUTH}" "${NMEA_PWS_URL}"
+```
+* `sudo nano /etc/systemd/system/nmea-pws.timer`
+```text
+[Unit]
+Description=Run NMEA PWS upload every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=nmea-pws.service
+
+[Install]
+WantedBy=timers.target
+```
+* `sudo systemctl daemon-reload`
+* `sudo systemctl enable --now nmea-pws.timer`
+* Check status with `systemctl list-timers nmea-pws.timer`, `sudo systemctl status nmea-pws.service`, and `journalctl -u nmea-pws.service -n 50`
+* Stop future uploads with `sudo systemctl stop nmea-pws.timer`; disable startup with `sudo systemctl disable nmea-pws.timer`
 
 ### Install Cloudfare tunnel
 * Use the "zero trust" panel in cloudflare to create `wsc.arcsite.ca` tunnel route
@@ -284,6 +327,6 @@ done
 ** `drwxr-xr-x 4  root   root     4096 Apr 24 12:50 /var/www`
 ** `drwxr-xr-x 4  pi     www-data 4096 Apr 23 20:32 /var/www/python`
 * if there are errors,
-** `sudo systemctl status nmea_repository.service`
-** `journalctl -u nmea_repository | tail`
+** `sudo systemctl status nmea-repository.service`
+** `journalctl -u nmea-repository.service | tail`
 ** `sudo ss -tulpn | grep :8000`
