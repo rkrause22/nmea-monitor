@@ -11,6 +11,8 @@ from nmea_helpers import format_utc_datetime
 from nmea_weather_window import WeatherWindowSummary
 
 
+# Weather Underground PWS Upload Protocol:
+# https://support.weather.com/s/article/PWS-Upload-Protocol?language=en_US
 PWS_UPLOAD_URL = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
 SOFTWARE_TYPE = "nmea-monitor"
 MPH_PER_KNOT = 1.150779448

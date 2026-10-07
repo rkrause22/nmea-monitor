@@ -29,6 +29,16 @@ Storage layout:
 * registrations are stored in `data/registrations/registrations.json`
 * `org` and `source` are treated case-insensitively by the API and normalized to lowercase in storage
 
+Repository architecture:
+
+* `nmea_repository.py` owns the Flask routes and endpoint response shapes.
+* `repository_service.py`, `repository_store.py`, and `repository_store_by_file.py` own repository operations and file storage.
+* `nmea_weather_window.py` parses stored records into weather samples, then builds period and segment summaries for `/nmea/history`, `/nmea/weather`, and `/nmea/pws`.
+* `nmea_plot_analysis.py` adds plot-focused analysis over the history sample stream.
+* `nmea_pws.py` formats and uploads Weather Underground PWS observations.
+* `nmea_helpers.py` contains shared date/time, math, logging, and presentation helpers.
+* `FrameAggregator` remains part of `nmea_aggregation.py` and is used by `nmea_filter.py` to produce uploaded frame records. The repository analysis endpoints do not use `FrameAggregator`.
+
 Endpoints:
 
 * `POST /nmea/add/<org>/<source>`
@@ -45,6 +55,8 @@ Endpoints:
   Purges stored messages for the source using the registered retention settings for that organization. Returns `files_deleted`, which is the number of stored daily files removed. Requires the organization bearer token.
 * `DELETE /nmea/purge/<org>/<source>/<what>`
   Purges stored messages for the source using an explicit keep rule or override value, rather than the default registration settings. If `what` is an integer, it is treated as the number of daily files to keep. Otherwise it is treated as a timespan such as `30-days` or `1-month`. Returns `files_deleted`, which is the number of stored daily files removed. Requires the organization bearer token.
+* `POST /nmea/fix/<org>/<source>` and `POST /nmea/fix/<org>/<source>/<yyyy-mm-dd>`
+  Rewrites a daily message file for the source, removing corrupt rows that cannot be parsed as stored JSON records. If no date is supplied, the current UTC date is used. Returns the target date, removed row count, and details for corrupt rows. Requires the organization bearer token.
 * `GET /nmea/last/<org>/<source>`
   Returns the latest stored message for the given `org/source` as plain text.
 * `GET /nmea/last/<org>/<source>/<what>`
@@ -58,15 +70,17 @@ Endpoints:
 * `GET /nmea/find/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
   Returns matching stored messages for the given `org/source`, optionally filtered by a date/time range and/or span. If no filter is supplied, it returns the latest message.
 * `GET /nmea/history/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
-  Returns plot-ready wind history for the given `org/source` as JSON, optionally filtered by a date/time range and/or span. `start` with `span` creates a window beginning at `start`; `end` with `span` creates a window ending at `end`; and `span` alone creates a trailing window ending at the current time. When both `start` and `end` are supplied, `span` is ignored. The response includes `org`, `source`, the supplied filter values, a `samples` array ordered from oldest to newest, analysis metadata, and a `window` object with six segment summaries containing average wind and gust wind for each segment.
+  Returns plot-ready wind history for the given `org/source` as JSON, optionally filtered by a date/time range and/or span. `start` with `span` creates a window beginning at `start`; `end` with `span` creates a window ending at `end`; and `span` alone creates a trailing window ending at the current time. When both `start` and `end` are supplied, `span` is ignored. The response includes `org`, `source`, the supplied filter values, a `samples` array ordered from oldest to newest, analysis metadata, and a `window` object with six segment summaries containing average wind and gust wind for each segment. The sample stream supports the polar plot's raw and rolling traces; the segment summaries support the average/gust bar graph.
 * `GET /nmea/weather/<org>/<source>`
-  Returns a weather-oriented summary view derived from the most recent stored message(s) for the `org/source`. This route also accepts `start`, `end`, and `span` query parameters like the history endpoint; when those filters are supplied, the weather summary is built from the matching messages instead of the default latest message. Weather JSON includes the current weather-style fields plus `barometric_pressure`, `wind_gust`, and a `window` summary.
+  Returns a weather-oriented summary view derived from the most recent stored message for the `org/source`. This route also accepts `start`, `end`, and `span` query parameters like the history endpoint; when those filters are supplied, the weather summary is built from the matching messages instead of the default latest message. Weather JSON includes position, temperature, average wind, gust wind, barometric pressure, windward/startpin map positions, and a `window` summary.
 * `GET /nmea/weather/<org>/<source>/<count>`
-  Returns a weather-oriented summary view derived from the most recent `count` stored messages for the `org/source`.
+  Returns a weather-oriented summary view derived from the most recent `count` stored messages for the `org/source`. This is useful for smoothing current map/monitor output over the last few uploaded frame records.
 * `GET /nmea/pws/<org>/<source>`
   Builds a 10-minute weather window from the latest stored message time, divides it into five equal two-minute segments, and uploads the latest segment's current conditions plus the 10-minute gust to Weather Underground using the PWS Upload Protocol. Requires the organization bearer token and registration fields `pwsid` and `pwskey`. The upload sends `winddir`, `windspeedmph`, `windgustmph`, `windgustdir`, `tempf`, `baromin`, `windspdmph_avg2m`, `winddir_avg2m`, `windgustmph_10m`, and `windgustdir_10m` when the source data can provide them.
 * `GET /<filename>.html`
   Serves a static HTML file from the repository directory.
+
+`/nmea/last`, `/nmea/find`, and `/nmea/count` are repository retrieval/query endpoints: they do not parse weather values or run weather-window analysis. `/nmea/history`, `/nmea/weather`, and `/nmea/pws` are analysis/reporting endpoints backed by `nmea_weather_window.py`.
 
 Time query values use ISO-style forms such as `2026`, `2026-06`, `2026-06-20`, `2026-06-20T14`, `2026-06-20T14:00`, or `2026-06-20T14:00:00-06:00`. Missing time parts default to zero.
 
