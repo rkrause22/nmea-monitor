@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from common_helpers import datesub
+from nmea_helpers import datesub
 from repository_store import MessageRecord, RegistrationRecord, RepairResult, RepositoryStore
 
 

@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
-from common_helpers import format_utc_datetime
+from nmea_helpers import format_utc_datetime
 from nmea_weather_window import WeatherWindowSummary
 
 

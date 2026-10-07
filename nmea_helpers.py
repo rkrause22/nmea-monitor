@@ -1,4 +1,4 @@
-"""Common helpers shared by the NMEA scripts."""
+"""Shared helpers for NMEA parsing, weather presentation, and repository scripts."""
 
 from __future__ import annotations
 
@@ -311,6 +311,36 @@ def round_to_position(value: float | None, digits: int) -> float | None:
     if value is None:
         return None
     return round(value, digits)
+
+
+COMPASS_DIRECTIONS = [
+    (11.25, "N"),
+    (33.75, "NNE"),
+    (56.25, "NE"),
+    (78.75, "ENE"),
+    (101.25, "E"),
+    (123.75, "ESE"),
+    (146.25, "SE"),
+    (168.75, "SSE"),
+    (191.25, "S"),
+    (213.75, "SSW"),
+    (236.25, "SW"),
+    (258.75, "WSW"),
+    (281.25, "W"),
+    (303.75, "WNW"),
+    (326.25, "NW"),
+    (348.75, "NNW"),
+    (360.0, "N"),
+]
+def symbolic_wind_direction(value: float | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value % 360.0
+    for upper_bound, symbol in COMPASS_DIRECTIONS:
+        if normalized < upper_bound:
+            return symbol
+    return COMPASS_DIRECTIONS[-1][1]
 
 
 def decimal_from_float(value: float) -> Decimal:

@@ -23,7 +23,7 @@ from nmea_aggregation import (
     parse_sentence,
     parse_zda_datetime,
 )
-from common_helpers import (
+from nmea_helpers import (
     format_utc_datetime,
     log_error_message as write_log_error_message,
     log_exception as write_log_exception,

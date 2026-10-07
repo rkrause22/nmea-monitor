@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
-from common_helpers import (
+from nmea_helpers import (
     average_direction_degrees,
     average_geographic_degrees,
     average_value,

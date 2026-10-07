@@ -1449,7 +1449,7 @@
       if (config.end) {
         params.set("end", config.end);
       }
-      return `/nmea/history2/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}?${params.toString()}`;
+      return `/nmea/history/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}?${params.toString()}`;
     }
 
     function readRequestConfig() {

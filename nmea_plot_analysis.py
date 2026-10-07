@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta
 
-from nmea_weather import round_weather_value, symbolic_wind_direction
+from nmea_helpers import round_to_position, symbolic_wind_direction
 
 
 ROLLING_WINDOW = timedelta(minutes=5)
@@ -445,14 +445,14 @@ def measurement_units(measurement_value_object: object, default: str) -> str:
 def measurement(value: float | None, units: str) -> dict[str, object] | None:
     if value is None:
         return None
-    return {"value": round_weather_value(value), "units": units}
+    return {"value": round_to_position(value, 1), "units": units}
 
 
 def direction_measurement(value: float | None, units: str) -> dict[str, object] | None:
     if value is None:
         return None
     return {
-        "value": round_weather_value(value),
+        "value": round_to_position(value, 1),
         "units": units,
         "symbol": symbolic_wind_direction(value),
     }

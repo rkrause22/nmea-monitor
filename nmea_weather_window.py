@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 
-from common_helpers import average_value, format_utc_datetime, round_to_position
+from nmea_helpers import average_value, format_utc_datetime, round_to_position
 from nmea_aggregation import (
     NMEAError,
     parse_gga,
