@@ -300,7 +300,14 @@ def create_app(
         if not samples:
             return jsonify({"error": "no weather samples found"}), 404
 
-        history = build_history2_summary(org, source, records, samples)
+        history = build_history2_summary(
+            org,
+            source,
+            records,
+            samples,
+            window_start=start,
+            window_end=end,
+        )
         history["start"] = start_text
         history["end"] = end_text
         history["span"] = span_text
@@ -602,6 +609,8 @@ def build_history2_summary(
     source: str,
     records: list[MessageRecord],
     samples: list[WeatherSample],
+    window_start: datetime | None = None,
+    window_end: datetime | None = None,
 ) -> dict[str, object]:
     plot_samples = [
         sample
@@ -622,11 +631,18 @@ def build_history2_summary(
         "analysis": analysis,
     }
 
-    if samples and samples[0].utc < samples[-1].utc:
+    if samples:
+        summary_start = window_start or samples[0].utc
+        summary_end = window_end or samples[-1].utc
+    else:
+        summary_start = None
+        summary_end = None
+
+    if summary_start is not None and summary_end is not None and summary_start < summary_end:
         window = build_weather_window_summary(
             samples,
-            start=samples[0].utc,
-            end=samples[-1].utc,
+            start=summary_start,
+            end=summary_end,
             segment_count=6,
         )
         result["window"] = {

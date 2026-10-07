@@ -673,9 +673,7 @@
       try {
         const history = await fetchHistory();
         const periods = extractWindPeriods(history.window?.segments || []);
-        const samples = periods.length
-          ? windSamplesFromPeriods(periods)
-          : extractWindSamples(history.samples || []);
+        const samples = extractWindSamples(history.samples || []);
         if (!samples.length) {
           throw new Error("History response did not contain any wind data.");
         }
@@ -706,8 +704,8 @@
       elements.subheading.textContent = describeWindow(history, samples);
       renderAnalysis(history.analysis || {});
 
-      const meanDirection = measurementValue(history.window?.overall?.average_wind?.direction)
-        ?? measurementValue(history.analysis?.wind?.mean?.direction);
+      const meanDirection = measurementValue(history.analysis?.wind?.mean?.direction)
+        ?? measurementValue(history.window?.overall?.average_wind?.direction);
 
       elements.plotFrame.innerHTML = renderPlotSvg(samples, {
         meanDirection: Number.isFinite(meanDirection) ? meanDirection : 0,
@@ -977,24 +975,6 @@
       };
     }
 
-    function windSamplesFromPeriods(periods) {
-      return periods
-        .map((period) => {
-          const direction = Number.isFinite(period.direction) ? period.direction : period.gustDirection;
-          if (!Number.isFinite(direction)) {
-            return null;
-          }
-
-          return {
-            time: new Date((period.startTime.getTime() + period.endTime.getTime()) / 2),
-            direction,
-            speed: Number.isFinite(period.speed) ? period.speed : period.maxSpeed,
-            rollingDirection: direction,
-          };
-        })
-        .filter((sample) => sample !== null);
-    }
-
     function windSpeedKnots(measurement) {
       const value = measurementValue(measurement);
       if (!Number.isFinite(value)) {
@@ -1260,7 +1240,7 @@
           <rect x="${barX}" y="${meanY}" width="${barWidth}" height="${meanBoxHeight}" fill="rgb(${meanFill})" />
           <line x1="${barX}" y1="${meanY}" x2="${roundToThree(barX + barWidth)}" y2="${meanY}" stroke="var(--text)" stroke-width="2.2" />
           ${arrow}
-          <text x="${centerX}" y="${Math.max(top + 13, maxY - 6)}" fill="var(--text)" font-size="15" font-weight="800" text-anchor="middle">${escapeHtml(maxLabel)}</text>
+          <text x="${centerX}" y="${top + 13}" fill="var(--text)" font-size="15" font-weight="800" text-anchor="middle">${escapeHtml(maxLabel)}</text>
           <text x="${centerX}" y="${meanY + meanBoxHeight / 2 + 5}" fill="var(--text)" font-size="15" font-weight="800" text-anchor="middle">${escapeHtml(speedLabel)}</text>
           <text x="${centerX}" y="${top + chartHeight + 26}" fill="var(--text)" font-size="16" font-weight="700" text-anchor="middle">${escapeHtml(formatTimeLabel(period.startTime))}</text>
         `;
