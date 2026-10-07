@@ -242,7 +242,7 @@
         params.set("span", config.span);
       }
       const query = params.size === 0 ? "" : `?${params.toString()}`;
-      return `/nmea/weather/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}${query}`;
+      return `/nmea/weather2/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}${query}`;
     }
 
     function readRequestConfig() {

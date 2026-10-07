@@ -672,12 +672,15 @@
     async function refreshHistory() {
       try {
         const history = await fetchHistory();
-        const samples = extractWindSamples(history.samples || []);
+        const periods = extractWindPeriods(history.window?.segments || []);
+        const samples = periods.length
+          ? windSamplesFromPeriods(periods)
+          : extractWindSamples(history.samples || []);
         if (!samples.length) {
-          throw new Error("History response did not contain any wind samples.");
+          throw new Error("History response did not contain any wind data.");
         }
 
-        renderHistory(history, samples);
+        renderHistory(history, samples, periods);
         setStatus(`Updated ${formatLocalDateTime(new Date())}`);
       } catch (error) {
         setStatus(error.message, true);
@@ -696,19 +699,21 @@
       return response.json();
     }
 
-    function renderHistory(history, samples) {
+    function renderHistory(history, samples, periods) {
       const title = `Conditions at ${displayValue(history.org)} ${displayValue(history.source)}`;
       document.title = title;
       elements.heading.textContent = title;
       elements.subheading.textContent = describeWindow(history, samples);
       renderAnalysis(history.analysis || {});
 
-      const meanDirection = measurementValue(history.analysis?.wind?.mean?.direction);
+      const meanDirection = measurementValue(history.window?.overall?.average_wind?.direction)
+        ?? measurementValue(history.analysis?.wind?.mean?.direction);
 
       elements.plotFrame.innerHTML = renderPlotSvg(samples, {
         meanDirection: Number.isFinite(meanDirection) ? meanDirection : 0,
         windowStart: dateOrNull(history.query_start_utc_time),
         windowEnd: dateOrNull(history.query_end_utc_time),
+        periods,
       });
     }
 
@@ -936,6 +941,76 @@
       };
     }
 
+    function extractWindPeriods(segments) {
+      return segments
+        .map(extractWindPeriod)
+        .filter((period) => period !== null)
+        .sort((left, right) => left.startTime - right.startTime);
+    }
+
+    function extractWindPeriod(segment) {
+      if (!segment || typeof segment !== "object") {
+        return null;
+      }
+
+      const startTime = new Date(segment.start);
+      const endTime = new Date(segment.end);
+      if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+        return null;
+      }
+
+      const speed = windSpeedKnots(segment.average_wind?.speed);
+      const maxSpeed = windSpeedKnots(segment.gust_wind?.speed);
+      const direction = measurementValue(segment.average_wind?.direction);
+      const gustDirection = measurementValue(segment.gust_wind?.direction);
+      if (!Number.isFinite(speed) && !Number.isFinite(maxSpeed) && !Number.isFinite(direction)) {
+        return null;
+      }
+
+      return {
+        startTime,
+        endTime,
+        speed,
+        maxSpeed,
+        direction: Number.isFinite(direction) ? normalizeDegrees(direction) : null,
+        gustDirection: Number.isFinite(gustDirection) ? normalizeDegrees(gustDirection) : null,
+      };
+    }
+
+    function windSamplesFromPeriods(periods) {
+      return periods
+        .map((period) => {
+          const direction = Number.isFinite(period.direction) ? period.direction : period.gustDirection;
+          if (!Number.isFinite(direction)) {
+            return null;
+          }
+
+          return {
+            time: new Date((period.startTime.getTime() + period.endTime.getTime()) / 2),
+            direction,
+            speed: Number.isFinite(period.speed) ? period.speed : period.maxSpeed,
+            rollingDirection: direction,
+          };
+        })
+        .filter((sample) => sample !== null);
+    }
+
+    function windSpeedKnots(measurement) {
+      const value = measurementValue(measurement);
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      const units = measurementUnits(measurement, "knots").toLowerCase();
+      if (units === "mph") {
+        return value / 1.150779448;
+      }
+      if (units === "m/s" || units === "mps") {
+        return value * 1.943844;
+      }
+      return value;
+    }
+
     function renderPlotSvg(samples, context) {
       const meanDirection = context.meanDirection;
       const plotStartTime = context.windowStart || samples[0].time;
@@ -953,7 +1028,9 @@
       const angleStep = chooseAngleStep(sectorSpan);
       const boundaryOffsets = buildOffsetTicks(startOffset, endOffset, angleStep);
       const radialTicks = buildRadialTicks(plotStartTime, new Date(plotEndMs), 6);
-      const strengthPeriods = buildWindStrengthPeriods(samples, radialTicks);
+      const strengthPeriods = context.periods?.length
+        ? context.periods
+        : buildWindStrengthPeriods(samples, radialTicks);
       const width = 1040;
       const height = 980;
       const viewBoxTop = 190;
@@ -1170,10 +1247,11 @@
           ? windStrengthColor(ratioInRange(period.maxSpeed, WIND_HIGHLIGHT_RANGE_KN.minimum, WIND_HIGHLIGHT_RANGE_KN.maximum)).join(" ")
           : meanFill;
         const centerX = roundToThree(x + columnWidth / 2);
+        const gustBoxCenterY = roundToThree(top + maxChartHeight / 2);
         const speedLabel = Number.isFinite(period.speed) ? formatCompactNumber(period.speed) : "-";
         const maxLabel = Number.isFinite(period.maxSpeed) ? formatCompactNumber(period.maxSpeed) : "-";
         const arrow = Number.isFinite(period.direction) && columnWidth >= 72
-          ? renderWindDirectionBarArrow(centerX, top + 18, period.direction, maxFill)
+          ? renderWindDirectionBarArrow(centerX, gustBoxCenterY, period.direction)
           : "";
 
         return `
@@ -1197,11 +1275,11 @@
       `;
     }
 
-    function renderWindDirectionBarArrow(x, y, direction, fillColor) {
+    function renderWindDirectionBarArrow(x, y, direction) {
       const rotation = normalizeDegrees(direction - 180);
       return `
         <g transform="translate(${x} ${y}) rotate(${rotation})">
-          <path d="M0 -15 L10 8 H4 V17 H-4 V8 H-10 Z" fill="rgb(${fillColor})" />
+          <path d="M0 -15 L10 8 H4 V17 H-4 V8 H-10 Z" fill="#8a949c" />
         </g>
       `;
     }
@@ -1391,7 +1469,7 @@
       if (config.end) {
         params.set("end", config.end);
       }
-      return `/nmea/history/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}?${params.toString()}`;
+      return `/nmea/history2/${encodeURIComponent(config.org)}/${encodeURIComponent(config.source)}?${params.toString()}`;
     }
 
     function readRequestConfig() {
