@@ -19,13 +19,23 @@ from common_helpers import (
     parse_utc_datetime,
 )
 from nmea_history import build_history_summary
+from nmea_plot_analysis import build_plot_analysis, enrich_plot_samples
 from nmea_pws import (
     build_pws_upload_fields,
     public_pws_fields,
     upload_pws_observation,
 )
-from nmea_weather import build_weather_summary
+from nmea_weather import (
+    build_weather_summary,
+    round_weather_value,
+    symbolic_wind_direction,
+    weather_offset_position,
+    weather_startpin_position,
+    weather_windward_range,
+)
 from nmea_weather_window import (
+    WeatherPeriodSummary,
+    WeatherSample,
     build_weather_window_summary,
     weather_period_to_dict,
     weather_samples_from_records,
@@ -271,6 +281,33 @@ def create_app(
         history["query_end_utc_time"] = format_utc_datetime(end) if end is not None else None
         return jsonify(history)
 
+    @app.get("/nmea/history2/<org>/<source>")
+    def get_nmea_history2(org: str, source: str) -> Response:
+        start_text = request.args.get("start")
+        end_text = request.args.get("end")
+        span_text = request.args.get("span")
+
+        try:
+            start, end = apply_date_filters(start_text, end_text, span_text)
+            records = service.get_history(org, source, start=start, end=end)
+        except ValueError as exc:
+            return handle_value_error("invalid history2 query parameters", exc)
+
+        if not records:
+            return jsonify({"error": "no records found"}), 404
+
+        samples = weather_samples_from_records(records, log_exception)
+        if not samples:
+            return jsonify({"error": "no weather samples found"}), 404
+
+        history = build_history2_summary(org, source, records, samples)
+        history["start"] = start_text
+        history["end"] = end_text
+        history["span"] = span_text
+        history["query_start_utc_time"] = format_utc_datetime(start) if start is not None else None
+        history["query_end_utc_time"] = format_utc_datetime(end) if end is not None else None
+        return jsonify(history)
+
     @app.get("/nmea/weather/<org>/<source>")
     @app.get("/nmea/weather/<org>/<source>/<int:count>")
     def get_nmea_weather(org: str, source: str, count: int = 1) -> Response:
@@ -296,6 +333,40 @@ def create_app(
         return jsonify(
             build_weather_summary(org,source, records, log_exception)
         )
+
+    @app.get("/nmea/weather2/<org>/<source>")
+    @app.get("/nmea/weather2/<org>/<source>/<int:count>")
+    def get_nmea_weather2(org: str, source: str, count: int = 1) -> Response:
+        if count < 1:
+            return json_error("count must be greater than zero", 400)
+
+        start_text = request.args.get("start")
+        end_text = request.args.get("end")
+        span_text = request.args.get("span")
+
+        try:
+            start, end = apply_date_filters(start_text, end_text, span_text)
+            if start is None and end is None:
+                records = service.find_messages(org, source, count=count)
+            else:
+                records = service.find_messages(org, source, start=start, end=end)
+        except ValueError as exc:
+            return handle_value_error("invalid weather2 request", exc)
+
+        if not records:
+            return jsonify({"error": "no records found"}), 404
+
+        samples = weather_samples_from_records(records, log_exception)
+        if not samples:
+            return jsonify({"error": "no weather samples found"}), 404
+
+        summary = build_weather_window_summary(
+            samples,
+            start=samples[0].utc,
+            end=samples[-1].utc,
+            segment_count=1,
+        )
+        return jsonify(build_weather2_summary(org, source, summary.overall))
 
     @app.get("/nmea/pws/<org>/<source>")
     def upload_nmea_pws(org: str, source: str) -> tuple[Response, int]:
@@ -460,6 +531,146 @@ def registration_response(
     if include_secrets:
         payload["pwskey"] = registration.pwskey
     return payload
+
+
+def build_weather2_summary(
+    org: str,
+    source: str,
+    period: WeatherPeriodSummary,
+) -> dict[str, object]:
+    wind_direction = period.average_wind.direction
+    wind_direction_units = period.average_wind.direction_units
+    wind_speed = period.average_wind.speed_knots
+    windward_range = weather_windward_range(wind_speed, "knots")
+
+    summary: dict[str, object] = {
+        "org": org,
+        "source": source,
+        "utc_end": format_utc_datetime(period.end),
+        "latitude": period.latitude,
+        "longitude": period.longitude,
+        "temperature": {
+            "value": round_weather_value(period.temperature_celsius),
+            "units": "C" if period.temperature_celsius is not None else None,
+        },
+        "barometric_pressure": {
+            "value": round_weather_value(period.pressure_mb),
+            "units": "mb" if period.pressure_mb is not None else None,
+        },
+        "wind_direction": {
+            "value": round_weather_value(wind_direction),
+            "units": wind_direction_units,
+            "symbol": symbolic_wind_direction(wind_direction),
+        },
+        "wind_speed": {
+            "value": round_weather_value(wind_speed),
+            "units": "knots" if wind_speed is not None else None,
+        },
+        "wind_gust": {
+            "speed": {
+                "value": round_weather_value(period.gust_wind.speed_knots),
+                "units": "knots" if period.gust_wind.speed_knots is not None else None,
+            },
+            "direction": {
+                "value": round_weather_value(period.gust_wind.direction),
+                "units": period.gust_wind.direction_units,
+                "symbol": symbolic_wind_direction(period.gust_wind.direction),
+            },
+        },
+        "windward": weather_offset_position(
+            period.latitude,
+            period.longitude,
+            wind_direction,
+            windward_range,
+        ),
+        "startpin": weather_startpin_position(
+            period.latitude,
+            period.longitude,
+            wind_direction,
+            100.0,
+        ),
+        "window": weather_period_to_dict(period),
+    }
+
+    if period.end - period.start > timedelta(minutes=1):
+        summary["utc_start"] = format_utc_datetime(period.start)
+    return summary
+
+
+def build_history2_summary(
+    org: str,
+    source: str,
+    records: list[MessageRecord],
+    samples: list[WeatherSample],
+) -> dict[str, object]:
+    plot_samples = [
+        sample
+        for sample in (history2_sample(sample) for sample in samples)
+        if sample is not None
+    ]
+    plot_samples = enrich_plot_samples(plot_samples)
+    analysis = build_plot_analysis(plot_samples)
+
+    result: dict[str, object] = {
+        "org": org,
+        "source": source,
+        "record_count": len(records),
+        "sample_count": len(plot_samples),
+        "oldest_utc_time": format_utc_datetime(records[0].utc) if records else None,
+        "latest_utc_time": format_utc_datetime(records[-1].utc) if records else None,
+        "samples": [history2_public_sample(sample) for sample in plot_samples],
+        "analysis": analysis,
+    }
+
+    if samples and samples[0].utc < samples[-1].utc:
+        window = build_weather_window_summary(
+            samples,
+            start=samples[0].utc,
+            end=samples[-1].utc,
+            segment_count=6,
+        )
+        result["window"] = {
+            "overall": weather_period_to_dict(window.overall),
+            "segments": [
+                weather_period_to_dict(segment)
+                for segment in window.segments
+            ],
+        }
+    return result
+
+
+def history2_sample(sample: WeatherSample) -> dict[str, object] | None:
+    if sample.wind_direction is None:
+        return None
+    return {
+        "utc_time": format_utc_datetime(sample.utc),
+        "wind_direction": {
+            "value": round_weather_value(sample.wind_direction),
+            "units": sample.wind_direction_units,
+            "symbol": symbolic_wind_direction(sample.wind_direction),
+        },
+        "wind_speed": {
+            "value": round_weather_value(sample.wind_speed_knots),
+            "units": "knots" if sample.wind_speed_knots is not None else None,
+        },
+        "barometric_pressure": {
+            "value": round_weather_value(sample.pressure_mb),
+            "units": "mb" if sample.pressure_mb is not None else None,
+        },
+        "temperature": {
+            "value": round_weather_value(sample.temperature_celsius),
+            "units": "C" if sample.temperature_celsius is not None else None,
+        },
+    }
+
+
+def history2_public_sample(sample: dict[str, object]) -> dict[str, object]:
+    return {
+        "utc_time": sample["utc_time"],
+        "wind_direction": sample["wind_direction"],
+        "wind_speed": sample["wind_speed"],
+        "rolling_wind_direction": sample.get("rolling_wind_direction"),
+    }
 
 
 def handle_value_error(

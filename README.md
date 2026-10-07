@@ -59,10 +59,14 @@ Endpoints:
   Returns matching stored messages for the given `org/source`, optionally filtered by a date/time range and/or span. If no filter is supplied, it returns the latest message.
 * `GET /nmea/history/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
   Returns plot-ready wind history for the given `org/source` as JSON, optionally filtered by a date/time range and/or span. `start` with `span` creates a window beginning at `start`; `end` with `span` creates a window ending at `end`; and `span` alone creates a trailing window ending at the current time. When both `start` and `end` are supplied, `span` is ignored. The response includes `org`, `source`, the supplied filter values, and a `samples` array ordered from oldest to newest.
+* `GET /nmea/history2/<org>/<source>?start=<time>&end=<time>&span=<timespan>`
+  Preview replacement for the history endpoint backed by the shared weather-window stack. It returns the existing history-style samples and analysis plus a `window` object with six segment summaries containing average wind and gust wind for each segment.
 * `GET /nmea/weather/<org>/<source>`
   Returns a weather-oriented summary view derived from the most recent stored message(s) for the `org/source`. This route also accepts `start`, `end`, and `span` query parameters like the history endpoint; when those filters are supplied, the weather summary is built from the matching messages instead of the default latest message. Weather JSON always includes `utc_end`, and includes `utc_start` only when the first and last ZDA times differ by more than one minute.
 * `GET /nmea/weather/<org>/<source>/<count>`
   Returns a weather-oriented summary view derived from the most recent `count` stored messages for the `org/source`. This count-based form also uses `utc_end` as its primary timestamp, with optional `utc_start` when the selected records span more than one minute.
+* `GET /nmea/weather2/<org>/<source>` and `GET /nmea/weather2/<org>/<source>/<count>`
+  Preview replacement for the weather endpoint backed by the shared weather-window stack. It returns the current weather-style fields plus `barometric_pressure`, `wind_gust`, and a `window` summary for side-by-side comparison before the original endpoint is migrated.
 * `GET /nmea/pws/<org>/<source>`
   Builds a 10-minute weather window from the latest stored message time, divides it into five equal two-minute segments, and uploads the latest segment's current conditions plus the 10-minute gust to Weather Underground using the PWS Upload Protocol. Requires the organization bearer token and registration fields `pwsid` and `pwskey`. The upload sends `winddir`, `windspeedmph`, `windgustmph`, `windgustdir`, `tempf`, `baromin`, `windspdmph_avg2m`, `winddir_avg2m`, `windgustmph_10m`, and `windgustdir_10m` when the source data can provide them.
 * `GET /<filename>.html`

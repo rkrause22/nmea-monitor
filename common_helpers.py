@@ -307,6 +307,12 @@ def average_value(total: float, count: int) -> float:
     return float(decimal_from_float(total) / Decimal(count))
 
 
+def round_to_position(value: float | None, digits: int) -> float | None:
+    if value is None:
+        return None
+    return round(value, digits)
+
+
 def decimal_from_float(value: float) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.000000001"), rounding=ROUND_HALF_UP)
 

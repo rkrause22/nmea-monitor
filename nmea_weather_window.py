@@ -6,9 +6,10 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 
-from common_helpers import average_value, format_utc_datetime
+from common_helpers import average_value, format_utc_datetime, round_to_position
 from nmea_aggregation import (
     NMEAError,
+    parse_gga,
     parse_mda,
     parse_mwd,
     parse_sentence,
@@ -28,6 +29,8 @@ class WeatherSample:
     wind_speed_knots: float | None = None
     temperature_celsius: float | None = None
     pressure_mb: float | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,8 @@ class WeatherPeriodSummary:
     gust_wind: WindSummary
     temperature_celsius: float | None
     pressure_mb: float | None
+    latitude: float | None
+    longitude: float | None
 
 
 @dataclass(frozen=True)
@@ -80,6 +85,8 @@ def weather_sample_from_record(
     wind_speed_knots: float | None = None
     temperature_celsius: float | None = None
     pressure_mb: float | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
     for raw_sentence in record.sentences:
         if not raw_sentence.strip():
@@ -113,6 +120,10 @@ def weather_sample_from_record(
                         and mda.wind_speed_metres_per_second is not None
                     ):
                         wind_speed_knots = mda.wind_speed_metres_per_second * 1.943844
+            elif sentence_type == "GGA":
+                gga = parse_gga(sentence)
+                latitude = gga.latitude_degrees
+                longitude = gga.longitude_degrees
         except NMEAError as exc:
             log_exception_callback("invalid weather window sentence skipped", exc, raw_sentence)
 
@@ -121,6 +132,8 @@ def weather_sample_from_record(
         and wind_speed_knots is None
         and temperature_celsius is None
         and pressure_mb is None
+        and latitude is None
+        and longitude is None
     ):
         return None
 
@@ -131,6 +144,8 @@ def weather_sample_from_record(
         wind_speed_knots=wind_speed_knots,
         temperature_celsius=temperature_celsius,
         pressure_mb=pressure_mb,
+        latitude=latitude,
+        longitude=longitude,
     )
 
 
@@ -191,6 +206,7 @@ def summarize_weather_period(
     start: datetime,
     end: datetime,
 ) -> WeatherPeriodSummary:
+    latitude, longitude = average_position(samples)
     return WeatherPeriodSummary(
         start=start,
         end=end,
@@ -201,6 +217,8 @@ def summarize_weather_period(
             sample.temperature_celsius for sample in samples
         ),
         pressure_mb=average_optional_values(sample.pressure_mb for sample in samples),
+        latitude=latitude,
+        longitude=longitude,
     )
 
 
@@ -264,6 +282,30 @@ def average_direction(values: list[tuple[float | None, float | None]]) -> float 
     return math.degrees(math.atan2(sin_sum, cos_sum)) % 360.0
 
 
+def average_position(samples: list[WeatherSample]) -> tuple[float | None, float | None]:
+    x_sum = 0.0
+    y_sum = 0.0
+    z_sum = 0.0
+    count = 0
+    for sample in samples:
+        if sample.latitude is None or sample.longitude is None:
+            continue
+        latitude = math.radians(sample.latitude)
+        longitude = math.radians(sample.longitude)
+        x_sum += math.cos(latitude) * math.cos(longitude)
+        y_sum += math.cos(latitude) * math.sin(longitude)
+        z_sum += math.sin(latitude)
+        count += 1
+
+    if count == 0:
+        return None, None
+
+    longitude = math.atan2(y_sum, x_sum)
+    horizontal = math.hypot(x_sum, y_sum)
+    latitude = math.atan2(z_sum, horizontal)
+    return math.degrees(latitude), math.degrees(longitude)
+
+
 def dominant_direction_units(samples: list[WeatherSample]) -> str | None:
     counts = {"M": 0, "T": 0}
     for sample in samples:
@@ -281,19 +323,27 @@ def weather_period_to_dict(period: WeatherPeriodSummary) -> dict[str, object]:
         "sample_count": period.sample_count,
         "average_wind": wind_summary_to_dict(period.average_wind),
         "gust_wind": wind_summary_to_dict(period.gust_wind),
-        "temperature": {"value": round_optional(period.temperature_celsius), "units": "C"},
-        "barometric_pressure": {"value": round_optional(period.pressure_mb), "units": "mb"},
+        "temperature": {
+            "value": round_to_position(period.temperature_celsius, 1),
+            "units": "C",
+        },
+        "barometric_pressure": {
+            "value": round_to_position(period.pressure_mb, 1),
+            "units": "mb",
+        },
+        "latitude": round_to_position(period.latitude, 6),
+        "longitude": round_to_position(period.longitude, 6),
     }
 
 
 def wind_summary_to_dict(wind: WindSummary) -> dict[str, object]:
     return {
-        "speed": {"value": round_optional(wind.speed_knots), "units": "knots"},
-        "direction": {"value": round_optional(wind.direction), "units": wind.direction_units},
+        "speed": {
+            "value": round_to_position(wind.speed_knots, 1),
+            "units": "knots",
+        },
+        "direction": {
+            "value": round_to_position(wind.direction, 1),
+            "units": wind.direction_units,
+        },
     }
-
-
-def round_optional(value: float | None) -> float | None:
-    if value is None:
-        return None
-    return round(value, 1)
