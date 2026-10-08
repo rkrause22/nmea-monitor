@@ -1,0 +1,533 @@
+<html>
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+    <title>NMEA-0183 Weather Data over LoRa</title>
+    <style type="text/css">@import url(https://themes.googleusercontent.com/fonts/css?kit=XGMkxXUZTA64h2imyzu79g);.lst-kix_qw9ectlgcb2q-0>li:before{content:"\0025cf   "}.lst-kix_qw9ectlgcb2q-1>li:before{content:"\0025cb   "}.lst-kix_qw9ectlgcb2q-4>li:before{content:"\0025cb   "}.lst-kix_qw9ectlgcb2q-5>li:before{content:"\0025a0   "}.lst-kix_g15vmkifvqqj-5>li:before{content:"\0025a0   "}.lst-kix_qw9ectlgcb2q-6>li:before{content:"\0025cf   "}.lst-kix_6hcq6pwls66a-3>li:before{content:"\0025cf   "}ul.lst-kix_msff1bpsu7an-8{list-style-type:none}.lst-kix_g15vmkifvqqj-4>li:before{content:"\0025cb   "}ul.lst-kix_6hcq6pwls66a-8{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-2{list-style-type:none}ul.lst-kix_msff1bpsu7an-7{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-1{list-style-type:none}ul.lst-kix_msff1bpsu7an-6{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-4{list-style-type:none}ul.lst-kix_msff1bpsu7an-5{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-3{list-style-type:none}ul.lst-kix_msff1bpsu7an-4{list-style-type:none}.lst-kix_6hcq6pwls66a-2>li:before{content:"\0025a0   "}ul.lst-kix_6hcq6pwls66a-4{list-style-type:none}ul.lst-kix_msff1bpsu7an-3{list-style-type:none}ul.lst-kix_6hcq6pwls66a-5{list-style-type:none}ul.lst-kix_msff1bpsu7an-2{list-style-type:none}.lst-kix_6hcq6pwls66a-1>li:before{content:"\0025cb   "}ul.lst-kix_6hcq6pwls66a-6{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-0{list-style-type:none}ul.lst-kix_msff1bpsu7an-1{list-style-type:none}ul.lst-kix_6hcq6pwls66a-7{list-style-type:none}ul.lst-kix_msff1bpsu7an-0{list-style-type:none}.lst-kix_g15vmkifvqqj-6>li:before{content:"\0025cf   "}.lst-kix_6hcq6pwls66a-0>li:before{content:"\0025cf   "}ul.lst-kix_p68t5qzcun54-2{list-style-type:none}ul.lst-kix_p68t5qzcun54-3{list-style-type:none}.lst-kix_qw9ectlgcb2q-3>li:before{content:"\0025cf   "}ul.lst-kix_p68t5qzcun54-4{list-style-type:none}ul.lst-kix_p68t5qzcun54-5{list-style-type:none}.lst-kix_g15vmkifvqqj-7>li:before{content:"\0025cb   "}.lst-kix_qw9ectlgcb2q-2>li:before{content:"\0025a0   "}ul.lst-kix_p68t5qzcun54-6{list-style-type:none}ul.lst-kix_p68t5qzcun54-7{list-style-type:none}ul.lst-kix_p68t5qzcun54-8{list-style-type:none}.lst-kix_g15vmkifvqqj-8>li:before{content:"\0025a0   "}.lst-kix_j97z84zb9pey-1>li:before{content:"\0025cb   "}.lst-kix_j97z84zb9pey-3>li:before{content:"\0025cf   "}ul.lst-kix_9v4soyqzgkcd-5{list-style-type:none}ul.lst-kix_9v4soyqzgkcd-6{list-style-type:none}ul.lst-kix_9v4soyqzgkcd-7{list-style-type:none}ul.lst-kix_p68t5qzcun54-0{list-style-type:none}.lst-kix_p68t5qzcun54-8>li:before{content:"\0025a0   "}ul.lst-kix_9v4soyqzgkcd-8{list-style-type:none}.lst-kix_j97z84zb9pey-2>li:before{content:"\0025a0   "}ul.lst-kix_p68t5qzcun54-1{list-style-type:none}ul.lst-kix_9v4soyqzgkcd-1{list-style-type:none}ul.lst-kix_6hcq6pwls66a-0{list-style-type:none}ul.lst-kix_9v4soyqzgkcd-2{list-style-type:none}ul.lst-kix_6hcq6pwls66a-1{list-style-type:none}ul.lst-kix_9v4soyqzgkcd-3{list-style-type:none}ul.lst-kix_6hcq6pwls66a-2{list-style-type:none}ul.lst-kix_9v4soyqzgkcd-4{list-style-type:none}ul.lst-kix_6hcq6pwls66a-3{list-style-type:none}.lst-kix_j97z84zb9pey-5>li:before{content:"\0025a0   "}ul.lst-kix_qw9ectlgcb2q-6{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-5{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-8{list-style-type:none}ul.lst-kix_9v4soyqzgkcd-0{list-style-type:none}ul.lst-kix_qw9ectlgcb2q-7{list-style-type:none}.lst-kix_j97z84zb9pey-4>li:before{content:"\0025cb   "}ul.lst-kix_j97z84zb9pey-1{list-style-type:none}.lst-kix_p68t5qzcun54-3>li:before{content:"\0025cf   "}ul.lst-kix_j97z84zb9pey-0{list-style-type:none}ul.lst-kix_j97z84zb9pey-3{list-style-type:none}ul.lst-kix_j97z84zb9pey-2{list-style-type:none}ul.lst-kix_j97z84zb9pey-5{list-style-type:none}ul.lst-kix_j97z84zb9pey-4{list-style-type:none}ul.lst-kix_j97z84zb9pey-7{list-style-type:none}.lst-kix_p68t5qzcun54-4>li:before{content:"\0025cb   "}ul.lst-kix_j97z84zb9pey-6{list-style-type:none}.lst-kix_p68t5qzcun54-7>li:before{content:"\0025cb   "}ul.lst-kix_j97z84zb9pey-8{list-style-type:none}.lst-kix_p68t5qzcun54-5>li:before{content:"\0025a0   "}.lst-kix_p68t5qzcun54-6>li:before{content:"\0025cf   "}.lst-kix_j97z84zb9pey-0>li:before{content:"\0025cf   "}.lst-kix_j97z84zb9pey-6>li:before{content:"\0025cf   "}.lst-kix_j97z84zb9pey-7>li:before{content:"\0025cb   "}.lst-kix_j97z84zb9pey-8>li:before{content:"\0025a0   "}.lst-kix_6hcq6pwls66a-4>li:before{content:"\0025cb   "}.lst-kix_qw9ectlgcb2q-8>li:before{content:"\0025a0   "}.lst-kix_qw9ectlgcb2q-7>li:before{content:"\0025cb   "}.lst-kix_g15vmkifvqqj-1>li:before{content:"\0025cb   "}.lst-kix_g15vmkifvqqj-3>li:before{content:"\0025cf   "}.lst-kix_6hcq6pwls66a-6>li:before{content:"\0025cf   "}.lst-kix_6hcq6pwls66a-5>li:before{content:"\0025a0   "}.lst-kix_g15vmkifvqqj-2>li:before{content:"\0025a0   "}.lst-kix_6hcq6pwls66a-8>li:before{content:"\0025a0   "}.lst-kix_6hcq6pwls66a-7>li:before{content:"\0025cb   "}.lst-kix_g15vmkifvqqj-0>li:before{content:"\0025cf   "}ul.lst-kix_g15vmkifvqqj-7{list-style-type:none}ul.lst-kix_g15vmkifvqqj-8{list-style-type:none}.lst-kix_h2l6ffrptwf7-8>li:before{content:"\0025a0   "}.lst-kix_h2l6ffrptwf7-6>li:before{content:"\0025cf   "}.lst-kix_h2l6ffrptwf7-7>li:before{content:"\0025cb   "}.lst-kix_h2l6ffrptwf7-4>li:before{content:"\0025cb   "}.lst-kix_9v4soyqzgkcd-0>li:before{content:"\0025cf   "}.lst-kix_h2l6ffrptwf7-1>li:before{content:"\0025cb   "}.lst-kix_h2l6ffrptwf7-5>li:before{content:"\0025a0   "}.lst-kix_9v4soyqzgkcd-2>li:before{content:"\0025a0   "}.lst-kix_h2l6ffrptwf7-2>li:before{content:"\0025a0   "}.lst-kix_msff1bpsu7an-6>li:before{content:"\0025cf   "}.lst-kix_h2l6ffrptwf7-3>li:before{content:"\0025cf   "}.lst-kix_9v4soyqzgkcd-1>li:before{content:"\0025cb   "}.lst-kix_msff1bpsu7an-4>li:before{content:"\0025cb   "}.lst-kix_msff1bpsu7an-5>li:before{content:"\0025a0   "}.lst-kix_msff1bpsu7an-3>li:before{content:"\0025cf   "}.lst-kix_msff1bpsu7an-0>li:before{content:"\0025cf   "}.lst-kix_msff1bpsu7an-1>li:before{content:"\0025cb   "}.lst-kix_msff1bpsu7an-2>li:before{content:"\0025a0   "}.lst-kix_p68t5qzcun54-1>li:before{content:"\0025cb   "}.lst-kix_p68t5qzcun54-2>li:before{content:"\0025a0   "}ul.lst-kix_h2l6ffrptwf7-1{list-style-type:none}ul.lst-kix_h2l6ffrptwf7-2{list-style-type:none}ul.lst-kix_h2l6ffrptwf7-0{list-style-type:none}.lst-kix_p68t5qzcun54-0>li:before{content:"\0025cf   "}ul.lst-kix_h2l6ffrptwf7-7{list-style-type:none}ul.lst-kix_h2l6ffrptwf7-8{list-style-type:none}ul.lst-kix_h2l6ffrptwf7-5{list-style-type:none}ul.lst-kix_h2l6ffrptwf7-6{list-style-type:none}ul.lst-kix_h2l6ffrptwf7-3{list-style-type:none}ul.lst-kix_h2l6ffrptwf7-4{list-style-type:none}.lst-kix_9v4soyqzgkcd-6>li:before{content:"\0025cf   "}.lst-kix_9v4soyqzgkcd-8>li:before{content:"\0025a0   "}.lst-kix_msff1bpsu7an-7>li:before{content:"\0025cb   "}.lst-kix_9v4soyqzgkcd-3>li:before{content:"\0025cf   "}.lst-kix_9v4soyqzgkcd-7>li:before{content:"\0025cb   "}.lst-kix_h2l6ffrptwf7-0>li:before{content:"\0025cf   "}.lst-kix_msff1bpsu7an-8>li:before{content:"\0025a0   "}.lst-kix_9v4soyqzgkcd-4>li:before{content:"\0025cb   "}li.li-bullet-0:before{margin-left:-18pt;white-space:nowrap;display:inline-block;min-width:18pt}.lst-kix_9v4soyqzgkcd-5>li:before{content:"\0025a0   "}ul.lst-kix_g15vmkifvqqj-1{list-style-type:none}ul.lst-kix_g15vmkifvqqj-2{list-style-type:none}ul.lst-kix_g15vmkifvqqj-0{list-style-type:none}ul.lst-kix_g15vmkifvqqj-5{list-style-type:none}ul.lst-kix_g15vmkifvqqj-6{list-style-type:none}ul.lst-kix_g15vmkifvqqj-3{list-style-type:none}ul.lst-kix_g15vmkifvqqj-4{list-style-type:none}ol{margin:0;padding:0}table td,table th{padding:0}.c4{border-right-style:solid;padding:5pt 5pt 5pt 5pt;border-bottom-color:#000000;border-top-width:0pt;border-right-width:0pt;border-left-color:#000000;vertical-align:top;border-right-color:#000000;border-left-width:0pt;border-top-style:solid;border-left-style:solid;border-bottom-width:0pt;width:156pt;border-top-color:#000000;border-bottom-style:solid}.c6{margin-left:36pt;padding-top:0pt;padding-left:0pt;padding-bottom:0pt;line-height:1.15;orphans:2;widows:2;text-align:left}.c2{color:#000000;font-weight:400;text-decoration:none;vertical-align:baseline;font-size:16pt;font-family:"Arial";font-style:normal}.c15{color:#434343;font-weight:400;text-decoration:none;vertical-align:baseline;font-size:14pt;font-family:"Arial";font-style:normal}.c20{padding-top:20pt;padding-bottom:6pt;line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}.c1{padding-top:0pt;padding-bottom:0pt;line-height:1.15;orphans:2;widows:2;text-align:left;height:11pt}.c21{color:#000000;font-weight:400;text-decoration:none;vertical-align:baseline;font-size:20pt;font-family:"Arial";font-style:normal}.c10{color:#000000;font-weight:400;text-decoration:none;vertical-align:baseline;font-size:10pt;font-family:"Arial";font-style:normal}.c5{padding-top:16pt;padding-bottom:4pt;line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}.c0{color:#000000;font-weight:400;text-decoration:none;vertical-align:baseline;font-size:11pt;font-family:"Arial";font-style:normal}.c12{padding-top:18pt;padding-bottom:6pt;line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}.c18{padding-top:0pt;padding-bottom:0pt;line-height:1.15;orphans:2;widows:2;text-align:center}.c7{padding-top:0pt;padding-bottom:0pt;line-height:1.15;orphans:2;widows:2;text-align:left}.c14{padding-top:18pt;padding-bottom:6pt;line-height:1.0;page-break-after:avoid;text-align:left}.c13{padding-top:16pt;padding-bottom:4pt;line-height:1.0;page-break-after:avoid;text-align:left}.c16{text-decoration-skip-ink:none;-webkit-text-decoration-skip:none;color:#1155cc;text-decoration:underline}.c23{border-spacing:0;border-collapse:collapse;margin-right:auto}.c8{padding-top:0pt;padding-bottom:0pt;line-height:1.0;text-align:left}.c25{background-color:#ffffff;max-width:468pt;padding:72pt 72pt 72pt 72pt}.c24{text-decoration-skip-ink:none;-webkit-text-decoration-skip:none;text-decoration:underline}.c17{color:#188038;font-weight:400;font-family:"Roboto Mono"}.c22{color:inherit;text-decoration:inherit}.c9{padding:0;margin:0}.c3{height:0pt}.c11{font-weight:700}.c19{color:#ff0000}.title{padding-top:0pt;color:#000000;font-size:26pt;padding-bottom:3pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}.subtitle{padding-top:0pt;color:#666666;font-size:15pt;padding-bottom:16pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}li{color:#000000;font-size:11pt;font-family:"Arial"}p{margin:0;color:#000000;font-size:11pt;font-family:"Arial"}h1{padding-top:20pt;color:#000000;font-size:20pt;padding-bottom:6pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h2{padding-top:18pt;color:#000000;font-size:16pt;padding-bottom:6pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h3{padding-top:16pt;color:#434343;font-size:14pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h4{padding-top:14pt;color:#666666;font-size:12pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h5{padding-top:12pt;color:#666666;font-size:11pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;orphans:2;widows:2;text-align:left}h6{padding-top:12pt;color:#666666;font-size:11pt;padding-bottom:4pt;font-family:"Arial";line-height:1.15;page-break-after:avoid;font-style:italic;orphans:2;widows:2;text-align:left}</style>
+  </head>
+  <body class="c25 doc-content">
+    <h1 class="c20" id="h.kb0258z3jts3">
+      <span class="c21">NMEA-0183 Weather Data over LoRa</span>
+    </h1>
+    <p class="c7">
+      <span class="c0">Russel Krause and Peter van Muyden</span>
+    </p>
+    <h2 class="c12" id="h.f2bpfydn1xkq">
+      <span class="c2">Problem Statement</span>
+    </h2>
+    <p class="c7">
+      <span class="c0">Our sailing club wanted to replace an aging anemometer on our race committee (RC) boat and researched a few options before settling on the AirMar 200WX. &nbsp;Our race officer had experience with the AirMar and felt it most adaptable for our situation, knowing that it was capable of producing data that could be displayed and consumed aboard the RC boat and hoping it could be transmitted to shore (1-3 kms away) over a line-of-sight LoRa link where the data could also be displayed and stored. A NMEA 0183 capable device was chosen because of its compatibility for serial transmission over the LoRa link.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">There may be more inexpensive solutions for this problem, but we wanted a system that was well trusted in the industry and that was adaptable for both onboard and onshore data analysis.</span>
+    </p>
+    <h2 class="c12" id="h.3esnd3xh101e">
+      <span class="c2">Overview</span>
+    </h2>
+    <p class="c7">
+      <span class="c0">The system collects and displays NMEA-0183 weather/navigation data from an AirMar anemometer mounted on our sailing club&rsquo;s race committee boat, displays it on a Garmin display, then transmits it over a WaveShare LoRa serial link, and receives it at a shore station where a Raspberry Pi runs Python scripts to filter, aggregate, store, and display the data as HTML, accessible on a display in the clubhouse as well as from our club website.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c18">
+      <span style="overflow: hidden; display: inline-block; margin: 0.00px 0.00px; border: 0.00px solid #000000; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px); width: 561.00px; height: 336.60px;">
+        <img alt="" src="images/image4.png" style="width: 561.00px; height: 336.60px; margin-left: 0.00px; margin-top: 0.00px; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px);" title="">
+      </span>
+    </p>
+    <h2 class="c12" id="h.bend2dwaeqo">
+      <span class="c2">Major Component List</span>
+    </h2>
+    <table class="c23">
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c11">Component</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c11">Purpose</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c11">Notes</span>
+          </p>
+        </td>
+      </tr>
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Airmar 200WX WeatherStation</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Produces wind/weather data</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">NMEA 0183/2000, RS232-capable weather sensor</span>
+          </p>
+        </td>
+      </tr>
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Garmin GMI 20 Marine Instrument Display</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Displays the live marine/weather data onboard</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Screens are configured to show only wind direction and speed</span>
+          </p>
+        </td>
+      </tr>
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">DSD TECH SH-U11L USB to RS485/RS422 Cable</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Converts the Airmar&rsquo;s NMEA signal to USB serial</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Provides (optional) serial connection to access NMEA data onboard RC boat</span>
+          </p>
+        </td>
+      </tr>
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">WaveShare SX1262 LoRa Data Transfer Kit</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Provides the wireless serial bridge between boat and shore</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Both LoRa endpoints configured with matching serial/radio settings</span>
+          </p>
+        </td>
+      </tr>
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">CableCreation USB to RS232 Female DB9 Serial Adapter</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Connects the shore-side serial output to USB</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Used on the receiving side before the Pi</span>
+          </p>
+        </td>
+      </tr>
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Raspberry Pi 4, 8 GB with 32 GB SD Card</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Runs the Python collection, repository, and display scripts</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span>Hosts </span>
+            <span class="c17">nmea_filter.py</span>
+            <span>, </span>
+            <span class="c17">nmea_repository.py</span>
+            <span class="c0">&nbsp;as services, and the web UI</span>
+          </p>
+        </td>
+      </tr>
+      <tr class="c3">
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">10.1 Inch 1920x1200 Touch Portable Screen for Raspberry Pi</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Local display for the weather dashboard</span>
+          </p>
+        </td>
+        <td class="c4" colspan="1" rowspan="1">
+          <p class="c8">
+            <span class="c0">Shows the NMEA monitor/dashboard output in our clubhouse</span>
+          </p>
+        </td>
+      </tr>
+    </table>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <h2 class="c12" id="h.esa0hvo2lgxx">
+      <span class="c2">Onboard Device Connections</span>
+    </h2>
+    <p class="c7">
+      <span class="c0">The Airmar 200WX supports both NMEA 0183 and NMEA 2000 and uses separate cables for each interface. Since we were going to be transmitting data serially (not packed-based), we chose to use the NMEA 0183 interface cable. Conveniently, our purchase came with both cables, we just left the NMEA 2000 cable in the box. </span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">Through experimentation, we learned that the NMEA 0183 interface is most compatible with RS422 serial adapters after first implementing an RS232 serial adapter. &nbsp;With RS232, we found that we were able to transmit the AirMar data stream easily enough, but were not able to send configuration data back to the AirMar over RS232, making it necessary to temporarily connect an RS422 adapter to configure the AirMar. &nbsp;In the end, we decided to use RS422 exclusively on the boat side as it simplified the wiring and allowed us the ability to configure the AirMar directly with the RS422/USB adapter.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">The diagram below shows the onboard connections required between the AirMar, the LoRa, the USB adapter, the Garmin and power.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span style="overflow: hidden; display: inline-block; margin: 0.00px 0.00px; border: 0.00px solid #000000; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px); width: 624.00px; height: 366.67px;">
+        <img alt="" src="images/image2.png" style="width: 624.00px; height: 366.67px; margin-left: 0.00px; margin-top: 0.00px; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px);" title="">
+      </span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">One notable surprise we had to resolve through experimentation was the reversal of the orange/yellow and blue/white pairs. By the documentation we read, we felt the polarities should be reversed, but this is the way everything worked.</span>
+    </p>
+    <h2 class="c14" id="h.9bqftxk4pu08">
+      <span class="c2">Onshore Device Connections</span>
+    </h2>
+    <p class="c7">
+      <span class="c0">Thankfully, the connections between the shore-side LoRa and the Raspberry Pi are much simpler! &nbsp;Here we just used an off-the-shelf RS232-USB cable and it worked in both directions. &nbsp;We actually tried using the RS422 connection on the shore side and it did not work as well.</span>
+    </p>
+    <h2 class="c14" id="h.s2mfuy713qhy">
+      <span>Device Configuration</span>
+    </h2>
+    <p class="c7">
+      <span class="c0">The sections below describe the configurations each of the onboard devices require.</span>
+    </p>
+    <h3 class="c13" id="h.55l8vlife8ya">
+      <span class="c15">AirMar 200WX Configuration</span>
+    </h3>
+    <p class="c7">
+      <span>To avoid saturating the LoRa at 4800 baud, the AirMar needed to be configured to reduce its output to only the necessary messages and only then at a low repetition rate. &nbsp;These changes were made using a terminal program by issuing the following commands as described in the AirMar WeatherStation Technical Manual (</span>
+      <span class="c16">
+        <a class="c22" href="https://www.google.com/url?q=https://www.psicompany.com/man-prod-info/furuno/prodweb/nav/pb100tech.pdf&amp;sa=D&amp;source=editors&amp;ust=1791497423795900&amp;usg=AOvVaw2zABZj2TkEhA13_kWLYAbu">https://www.psicompany.com/man-prod-info/furuno/prodweb/nav/pb100tech.pdf</a>
+      </span>
+      <span class="c0">) using the RS422 to USB adapter that we wired in onboard (or by sending them back from shore using the shore-side USB adapter).</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <ul class="c9 lst-kix_qw9ectlgcb2q-0 start">
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,BAUD,4800&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// set the baud rate to 4800</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTX,0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// temporarily stop NMEA transmissions</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,EN,ALL,0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// disable all sentence transmissions</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,EN,ZDA,1,13&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// enable ZDA (time message) every 1.3 seconds</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,EN,MWD,1,17&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// enable MWD (weather message) every 1.7 seconds</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,EN,MDA,1,29&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// enable MDA (weather message) every 2.9 seconds</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,EN,GGA,1,37&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// enable GGA (GPS message) every 3.7 seconds</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,EN,S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// save settings to CMOS</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTC,EN,Q&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// echo settings for confirmation</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTX,1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// restart NMEA transmissions</span>
+      </li>
+    </ul>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">After making these setting changes, we power cycled the AirMar and then echoed the settings back using $PAMTC,EN,Q to make sure they were saved correctly.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">You might notice the odd distribution of message timings. &nbsp;We chose period lengths as prime numbers between command outputs to ensure message collisions would redistribute over time. &nbsp;These numbers work, but there are still collisions in the LoRa transmissions at 4800 baud and these rates may need more refinement. &nbsp;The Python listener had to be written robustly to deal with over-written messages, and uses message averaging over multiple ZDA time &ldquo;frames&rdquo; to manage the data mangling.</span>
+    </p>
+    <h3 class="c5" id="h.gxxglof7ft6a">
+      <span class="c15">LoRa Configuration</span>
+    </h3>
+    <p class="c7">
+      <span>Each LoRa has to be configured before use to ensure they are &ldquo;paired&rdquo; for communication, and so that their transmission settings match the AirMar. See the SX1262-LoRa-DTU-xF manual (</span>
+      <span class="c16">
+        <a class="c22" href="https://www.google.com/url?q=https://www.waveshare.com/wiki/SX1262-LoRa-DTU-xF?srsltid%3DAfmBOoprBd069ecNsMlJdKJpC65VUkA-s1yuACzGc4LBFTF1aM_M_bUH&amp;sa=D&amp;source=editors&amp;ust=1791497423797578&amp;usg=AOvVaw1as8eLOawgI8PD9Je6F2BA">https://www.waveshare.com/wiki/SX1262-LoRa-DTU-xF?srsltid=AfmBOoprBd069ecNsMlJdKJpC65VUkA-s1yuACzGc4LBFTF1aM_M_bUH</a>
+      </span>
+      <span class="c0">) for more information.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span>By default, the LoRa is configured to use RS232 at 9600 baud. &nbsp;To switch between RS232 and RS422, you press the &ldquo;Key&rdquo; button once (</span>
+      <span class="c19">see caution below</span>
+      <span class="c0">) using an initial connection of 9600 (which you need to change to 4800 as below).</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">The device uses &ldquo;modem-like&rdquo; (AT) commands to update its settings issued via the RS422 to USB connector, but before you issue any AT commands, you need to temporarily disable the AirMar transmissions.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <ul class="c9 lst-kix_j97z84zb9pey-0 start">
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTX,0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// temporarily stop AirMar NMEA transmissions</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">+++&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// type three &ldquo;+&rdquo; quickly and wait</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT&lt;cr&gt;&lt;lf&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// should echo OK</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+BAUD=4800&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 4800=Baud rate (default is 9600)</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+BAUD?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// should echo 4800</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+BW=1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 1=250Khz (default 0=125Khz)</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+BW?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// should echo 1</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+MODE=1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 1=Streaming mode</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+MODE?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// should echo 1</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+PORT=1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 1=RS422 mode (onboard); 3=RS232 mode (onshore)</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+PORT?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// should echo 1 (afloat), 3 (ashore)</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">AT+EXIT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Saves settings and restarts device</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">$PAMTX,1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// restart AirMar NMEA transmissions</span>
+      </li>
+    </ul>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">Perhaps the key configuration here is the transmission bandwidth at 250Khz (AT+BW=1). Some research indicated that transmitting at the default 125Khz would exacerbate the buffer overruns since the time it takes to transmit the data over air at 125Khz might be longer than it takes to fill the buffer at 4800 baud. &nbsp;The tradeoff is that the higher frequency diminishes the transmission distance, however we hope that 250Khz will perform well enough over 1-3km.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">NOTE: Afloat, we use the LoRa&rsquo;s RS422 configuration because it is much better matched to the AirMar interface. &nbsp;Ashore, we were able to use the simpler RS232 connection between the LoRa and the Raspberry Pi. So long as the BAUD and MODE are the same between the LoRas, they can communicate with each other.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c11 c19">CAUTION</span>
+      <span>: </span>
+      <span class="c24">Be very careful not to press the key button within 3 seconds of powering the device on</span>
+      <span class="c0">&nbsp;- doing so will put the device into upgrade mode, and this cannot be reset without uploading a new bios update&hellip; This happened to us and we had to complete a BIOS upgrade to unbrick the device! &nbsp;See manual for more details.</span>
+    </p>
+    <h3 class="c5" id="h.mw6xe24hlfm9">
+      <span class="c15">Garmin Configuration</span>
+    </h3>
+    <p class="c7">
+      <span class="c0">Because we disabled many of the AirMar&rsquo;s NMEA output sentence types, very few (if any) of the default screens will show any data. &nbsp;We simply deleted all the default screen configurations and created a new screen that only showed Wind Speed and Wind Direction (since that is all we need on our RC boat).</span>
+    </p>
+    <h2 class="c12" id="h.bc4yfpy8565h">
+      <span class="c2">Software</span>
+    </h2>
+    <p class="c7">
+      <span class="c0">The raw NMEA 0183 sentences are received by a Raspberry Pi after being transmitted over the LoRa. As mentioned above, these messages are sometimes garbled and/or over-written. &nbsp;Fortunately, we are able to use the NMEA sentence checksums to validate which messages are acceptable.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">We created two Python scripts: </span>
+    </p>
+    <ul class="c9 lst-kix_6hcq6pwls66a-0 start">
+      <li class="c6 li-bullet-0">
+        <span class="c11">nmea_filter.py</span>
+        <span class="c0">&nbsp;to read, filter and forward averaged NMEA data to the repository; and </span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c11">nmea_repository.py</span>
+        <span class="c0">&nbsp;to store and serve the data via a repository.</span>
+      </li>
+    </ul>
+    <h3 class="c5" id="h.lgc8y5fnl8n5">
+      <span class="c15">nmea_filter.py </span>
+    </h3>
+    <ul class="c9 lst-kix_p68t5qzcun54-0 start">
+      <li class="c6 li-bullet-0">
+        <span class="c0">Listens to the ttyUSB0 serial port for incoming sentences (each terminated with \r\n).</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">Validates each sentence using their checksums</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">Filters out unwanted sentence types (we only use ZDA, WMD, MDA and GGA types)</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">Aggregates all WMD, MDA and GGA sentences received over a configurable number of ZDA time frames</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">Sends each ZDA frame aggregation of WMD, MDA, GGA sentences to the repository</span>
+      </li>
+    </ul>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">One record is sent to the repository for each set of ZDA frame aggregations received. &nbsp;Within the period between ZDA sentences, zero or more WMD, MDA, GGA sentences may be received. &nbsp;Each of these sentence types is aggregated into one sentence of each type, so that, at most, each ZDA frame will contain 1 WMD, 1 MDA and 1 GGA sentence. The aggregation method depends on the type of data, but generally: wind direction, wind strength, temperature, barometric pressure, latitude, longitude, etc are averaged, other data such as time, may be selected as the first or last of the data received.</span>
+    </p>
+    <h3 class="c5" id="h.cp06ypt2udgy">
+      <span class="c15">nmea_repository.py</span>
+    </h3>
+    <p class="c7">
+      <span class="c0">The repository is a REST service that provides the following methods (among others):</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <ul class="c9 lst-kix_msff1bpsu7an-0 start">
+      <li class="c6 li-bullet-0">
+        <span class="c0">add: accepts a ZDA frame aggregation from nmea_filter.py and appends it to a text file as JSON object.</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">last: returns the latest (n) ZDA frame aggregation(s) as NMEA 0183 sentences</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">weather: returns an aggregation of weather data for a given time span</span>
+      </li>
+      <li class="c6 li-bullet-0">
+        <span class="c0">history: returns wind direction and strength data to plot a graph for a given time span</span>
+      </li>
+    </ul>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">Like nmea_filter.py, the repository also aggregates data over (longer) time periods. In our HTML presentation by default, we show an aggregation of data over the past 30 minutes, but the user can select any period from our database. &nbsp;(data over 1 year-old is purged).</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">Below is a closer look at two of our output pages:</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span style="overflow: hidden; display: inline-block; margin: 0.00px 0.00px; border: 0.00px solid #000000; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px); width: 624.00px; height: 342.67px;">
+        <img alt="" src="images/image1.png" style="width: 624.00px; height: 342.67px; margin-left: 0.00px; margin-top: 0.00px; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px);" title="">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c10">The Plot page shows an aggregation of the anemometer data over any period of data we have in the database and a plot of wind speed and direction over the period. &nbsp;By default it shows the last 30 minutes of data, updated every 10 seconds.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span style="overflow: hidden; display: inline-block; margin: 0.00px 0.00px; border: 0.00px solid #000000; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px); width: 624.00px; height: 328.00px;">
+        <img alt="" src="images/image3.png" style="width: 624.00px; height: 328.00px; margin-left: 0.00px; margin-top: 0.00px; transform: rotate(0.00rad) translateZ(0px); -webkit-transform: rotate(0.00rad) translateZ(0px);" title="">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c10">The &ldquo;Map&rdquo; page uses Google Maps to plot the location of our RC Barge and uses an info popup to indicate the average wind speed and direction and temperature for the selected period.</span>
+    </p>
+    <h2 class="c12" id="h.8blc5e6zx113">
+      <span class="c2">Improvements</span>
+    </h2>
+    <p class="c7">
+      <span class="c0">The failure rate we see on the LoRa connection remains quite high. However, by confirming the checksums on each NMEA sentence, we have confidence which sentences are valid and which are not and we were able to simply ignore those that are corrupt or incomplete, but this is not ideal.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">The LoRa device we have chosen does have a &ldquo;packet mode&rdquo; which can send up to 960 bytes in a single message, which would be more than enough for each NMEA sentence, however, the device requires that each packet is prepended with 3 bytes to identify the packet. Since we do not have any device onboard capable of modifying the sentences before sending them, we cannot use this feature.</span>
+    </p>
+    <p class="c1">
+      <span class="c0">
+      </span>
+    </p>
+    <p class="c7">
+      <span class="c0">If we were to add a device onboard (such as a Raspberry Pi or Arduino), we could potentially filter and aggregate the NMEA messages before sending them over the LoRa, further reducing the bandwidth requirements and then use packet mode to send them - something we may consider in the future.</span>
+    </p>
+  </body>
+</html>
