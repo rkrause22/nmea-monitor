@@ -207,6 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 # project specific files
+.agents/
+.vscode/
 data/
 logs/
 *.nmea
