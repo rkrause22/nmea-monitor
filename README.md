@@ -1,11 +1,13 @@
 # nmea-monitor project
 Python scripts and HTML pages to monitor, filter and present NMEA-0183 streams.
 
-## nmea-monitor.html
+## HTML display pages
 
-`nmea-monitor.html` is a simple browser-based weather dashboard for the NMEA repository. It fetches the latest weather summary from the repository's `/nmea/weather/WSC/Barge` endpoint every 10 seconds and displays three current conditions: local date/time, temperature, and wind.
+`nmea-frame.html` is the kiosk-style landing page for the live display. It frames the operational views with the configured organization and source query parameters, so a display or browser shortcut can open one stable page such as `nmea-frame.html?org=WSC&src=Barge`.
 
-The page is intentionally lightweight: a single responsive table, a dynamic title/header based on the returned org and source, and a status line showing when the data was last updated or whether an error occurred. It also formats wind speed and direction cleanly, including compass symbols and degree details when available, so it works as a compact "current weather at source" display for live NMEA data.
+`nmea-plot.html` shows wind history for a selected period. It uses `/nmea/history/<org>/<source>` to draw the raw sample trace, rolling average, directional indicators, and average/gust segment bars. By default it follows the latest data over a recent window and refreshes automatically for live monitoring.
+
+`nmea-map.html` shows the source position and recent weather summary on a Google map. It uses `/nmea/weather/<org>/<source>/<count>` for smoothed current conditions, including wind, temperature, barometric pressure, and windward/startpin reference points when available.
 
 ## nmea_filter.py
 
